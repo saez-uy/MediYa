@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
-  const { signIn, profile } = useAuth()
-  const navigate = useNavigate()
+  const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -16,13 +15,7 @@ export default function Login() {
     setLoading(true)
     try {
       await signIn(email, password)
-      // onAuthStateChange actualiza profile; navegamos tras un tick
-      setTimeout(() => {
-        const role = profile?.role
-        if (role === 'doctor') navigate('/dashboard/medico')
-        else if (role === 'patient') navigate('/dashboard/paciente')
-        else navigate('/')
-      }, 300)
+      // App.tsx redirige automáticamente desde /login cuando user+profile están listos
     } catch (err) {
       setError(err instanceof Error ? 'Email o contraseña incorrectos.' : 'Error al ingresar.')
     } finally {
