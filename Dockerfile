@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# ---- Serve stage ----
+# ---- Serve stage ---- cache-bust:1
 FROM node:20-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
