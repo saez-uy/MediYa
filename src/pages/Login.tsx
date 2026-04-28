@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
   const { signIn } = useAuth()
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,7 +17,15 @@ export default function Login() {
     setLoading(true)
     try {
       await signIn(email, password)
-      // App.tsx redirige automáticamente desde /login cuando user+profile están listos
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user!.id)
+        .single()
+      if (profile?.role === 'doctor') navigate('/dashboard/medico')
+      else if (profile?.role === 'patient') navigate('/dashboard/paciente')
+      else navigate('/')
     } catch (err) {
       setError(err instanceof Error ? 'Email o contraseña incorrectos.' : 'Error al ingresar.')
     } finally {
