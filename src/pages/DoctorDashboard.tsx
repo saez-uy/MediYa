@@ -1,0 +1,232 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
+import { STATUS_LABELS, DAYS_OF_WEEK } from '../lib/constants'
+import type { AppointmentStatus } from '../types'
+
+interface AppointmentRow {
+  id: string
+  requested_date: string
+  requested_time: string
+  status: AppointmentStatus
+  patient_notes: string | null
+  doctor_notes: string | null
+  created_at: string
+  patient: { full_name: string; phone: string | null } | null
+}
+
+type FilterTab = 'all' | AppointmentStatus
+
+export default function DoctorDashboard() {
+  const { user, profile } = useAuth()
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<FilterTab>('all')
+  const [updating, setUpdating] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (user) fetchAppointments()
+  }, [user])
+
+  async function fetchAppointments() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        id,
+        requested_date,
+        requested_time,
+        status,
+        patient_notes,
+        doctor_notes,
+        created_at,
+        patient:profiles!appointments_patient_id_fkey(full_name, phone)
+      `)
+      .eq('doctor_id', user!.id)
+      .order('requested_date', { ascending: true })
+
+    if (!error && data) setAppointments(data as unknown as AppointmentRow[])
+    setLoading(false)
+  }
+
+  async function updateStatus(appointmentId: string, status: AppointmentStatus) {
+    setUpdating(appointmentId)
+    const { error } = await supabase
+      .from('appointments')
+      .update({ status })
+      .eq('id', appointmentId)
+      .eq('doctor_id', user!.id)
+
+    if (!error) {
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === appointmentId ? { ...a, status } : a))
+      )
+    }
+    setUpdating(null)
+  }
+
+  const pending = appointments.filter((a) => a.status === 'pending')
+  const accepted = appointments.filter((a) => a.status === 'accepted')
+  const rejected = appointments.filter((a) => a.status === 'rejected')
+
+  const displayed =
+    tab === 'all'
+      ? appointments
+      : tab === 'pending'
+      ? pending
+      : tab === 'accepted'
+      ? accepted
+      : rejected
+
+  const tabs: { key: FilterTab; label: string; count: number }[] = [
+    { key: 'all', label: 'Todas', count: appointments.length },
+    { key: 'pending', label: 'Pendientes', count: pending.length },
+    { key: 'accepted', label: 'Confirmadas', count: accepted.length },
+    { key: 'rejected', label: 'Rechazadas', count: rejected.length },
+  ]
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-10">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Mi agenda</h1>
+          <p className="text-gray-500 mt-1">Hola, {profile?.full_name}</p>
+        </div>
+        <Link to="/medico/configurar" className="btn-secondary text-sm">
+          Editar mi perfil
+        </Link>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="card text-center">
+          <p className="text-3xl font-bold text-yellow-600">{pending.length}</p>
+          <p className="text-sm text-gray-500 mt-1">Pendientes</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-3xl font-bold text-green-600">{accepted.length}</p>
+          <p className="text-sm text-gray-500 mt-1">Confirmadas</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-3xl font-bold text-red-600">{rejected.length}</p>
+          <p className="text-sm text-gray-500 mt-1">Rechazadas</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-6 overflow-x-auto">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+              tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+            {t.count > 0 && (
+              <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${tab === t.key ? 'bg-primary-100 text-primary-700' : 'bg-gray-200 text-gray-600'}`}>
+                {t.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Appointments list */}
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600" />
+        </div>
+      ) : displayed.length === 0 ? (
+        <div className="text-center py-16 text-gray-500">
+          <p className="text-4xl mb-3">📭</p>
+          <p>No hay turnos {tab !== 'all' ? `en este estado` : 'todavía'}.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {displayed.map((appt) => (
+            <AppointmentCard
+              key={appt.id}
+              appointment={appt}
+              onAccept={() => updateStatus(appt.id, 'accepted')}
+              onReject={() => updateStatus(appt.id, 'rejected')}
+              updating={updating === appt.id}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AppointmentCard({
+  appointment,
+  onAccept,
+  onReject,
+  updating,
+}: {
+  appointment: AppointmentRow
+  onAccept: () => void
+  onReject: () => void
+  updating: boolean
+}) {
+  const date = new Date(appointment.requested_date + 'T12:00:00')
+  const dateStr = date.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' })
+  const timeStr = appointment.requested_time.slice(0, 5)
+
+  const statusClass =
+    appointment.status === 'pending'
+      ? 'badge-pending'
+      : appointment.status === 'accepted'
+      ? 'badge-accepted'
+      : 'badge-rejected'
+
+  return (
+    <div className="card">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-2">
+            <span className={statusClass}>{STATUS_LABELS[appointment.status]}</span>
+            <span className="text-gray-400 text-xs">
+              Solicitado el {new Date(appointment.created_at).toLocaleDateString('es-UY')}
+            </span>
+          </div>
+          <h3 className="font-semibold text-gray-900">{appointment.patient?.full_name ?? 'Paciente'}</h3>
+          {appointment.patient?.phone && appointment.status === 'accepted' && (
+            <p className="text-primary-600 text-sm mt-0.5">📞 {appointment.patient.phone}</p>
+          )}
+          <p className="text-gray-600 text-sm mt-2 capitalize">
+            📅 {dateStr} a las {timeStr}
+          </p>
+          {appointment.patient_notes && (
+            <p className="text-gray-500 text-sm mt-2 bg-gray-50 p-2.5 rounded-lg">
+              <span className="font-medium">Motivo:</span> {appointment.patient_notes}
+            </p>
+          )}
+        </div>
+
+        {appointment.status === 'pending' && (
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              onClick={onAccept}
+              disabled={updating}
+              className="btn-primary text-sm py-2 px-4"
+            >
+              Confirmar
+            </button>
+            <button
+              onClick={onReject}
+              disabled={updating}
+              className="btn-danger text-sm py-2 px-4"
+            >
+              Rechazar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
