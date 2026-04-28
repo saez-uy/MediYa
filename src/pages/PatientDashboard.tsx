@@ -13,8 +13,11 @@ interface AppointmentRow {
   status: AppointmentStatus
   patient_notes: string | null
   created_at: string
-  doctor: { full_name: string; phone: string | null } | null
-  doctor_specialty: { specialty: string } | null
+  doctor: {
+    full_name: string
+    phone: string | null
+    doctor_profiles: { specialty: string } | null
+  } | null
 }
 
 export default function PatientDashboard() {
@@ -39,8 +42,7 @@ export default function PatientDashboard() {
         status,
         patient_notes,
         created_at,
-        doctor:profiles!appointments_doctor_id_fkey(full_name, phone),
-        doctor_specialty:doctor_profiles!appointments_doctor_id_fkey(specialty)
+        doctor:profiles!appointments_doctor_id_fkey(full_name, phone, doctor_profiles(specialty))
       `)
       .eq('patient_id', user!.id)
       .order('requested_date', { ascending: false })
@@ -142,8 +144,8 @@ function PatientAppointmentCard({
             <span className={statusClass}>{STATUS_LABELS[appointment.status]}</span>
           </div>
           <h3 className="font-semibold text-gray-900">{appointment.doctor?.full_name ?? 'Médico'}</h3>
-          {appointment.doctor_specialty?.specialty && (
-            <p className="text-primary-600 text-sm">{appointment.doctor_specialty.specialty}</p>
+          {appointment.doctor?.doctor_profiles?.specialty && (
+            <p className="text-primary-600 text-sm">{appointment.doctor.doctor_profiles.specialty}</p>
           )}
           <p className="text-gray-600 text-sm mt-2 capitalize">
             📅 {dateStr} a las {timeStr}
