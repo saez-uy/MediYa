@@ -30,13 +30,12 @@ export default function DoctorPublicProfile() {
       .from('doctor_profiles')
       .select(`
         id,
-        specialty,
         bio,
         consultation_fee,
         is_active,
         profile:profiles!inner(id, full_name, phone, role, created_at),
-        zones:doctor_zones(*),
-        schedules:doctor_schedules(*)
+        specialties:doctor_specialties(specialty),
+        zones:doctor_zones(id, department, zone, schedules:doctor_zone_schedules(*))
       `)
       .eq('id', id)
       .single()
@@ -99,12 +98,6 @@ export default function DoctorPublicProfile() {
     .slice(0, 2)
     .toUpperCase()
 
-  const groupedZones = doctor.zones.reduce<Record<string, string[]>>((acc, z) => {
-    if (!acc[z.department]) acc[z.department] = []
-    acc[z.department].push(z.zone)
-    return acc
-  }, {})
-
   const isOwnProfile = user?.id === id
 
   return (
@@ -123,7 +116,15 @@ export default function DoctorPublicProfile() {
             </div>
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900">{doctor.profile.full_name}</h1>
-              <p className="text-primary-600 font-medium mt-1">{doctor.specialty}</p>
+              {doctor.specialties.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {doctor.specialties.map((s) => (
+                    <span key={s.specialty} className="bg-primary-100 text-primary-700 text-xs px-2.5 py-1 rounded-full font-medium">
+                      {s.specialty}
+                    </span>
+                  ))}
+                </div>
+              )}
               {doctor.consultation_fee && (
                 <p className="text-gray-500 text-sm mt-1">
                   💰 $ {doctor.consultation_fee.toLocaleString('es-UY')} la consulta
@@ -140,42 +141,34 @@ export default function DoctorPublicProfile() {
             </div>
           )}
 
-          {/* Zones */}
-          {Object.keys(groupedZones).length > 0 && (
+          {/* Zones with schedules */}
+          {doctor.zones.length > 0 && (
             <div className="card">
-              <h2 className="font-semibold text-gray-800 mb-4">Zonas de atención</h2>
-              <div className="space-y-3">
-                {Object.entries(groupedZones).map(([dept, zones]) => (
-                  <div key={dept}>
-                    <p className="text-sm font-medium text-gray-600 mb-2">{dept}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {zones.map((z) => (
-                        <span key={z} className="bg-primary-50 text-primary-700 text-sm px-3 py-1 rounded-full">
-                          {z}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Schedule */}
-          {doctor.schedules.length > 0 && (
-            <div className="card">
-              <h2 className="font-semibold text-gray-800 mb-4">Horarios disponibles</h2>
-              <div className="space-y-2">
-                {doctor.schedules
-                  .sort((a, b) => a.day_of_week - b.day_of_week)
-                  .map((s) => (
-                    <div key={s.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                      <span className="font-medium text-gray-700">{DAYS_OF_WEEK[s.day_of_week]}</span>
-                      <span className="text-gray-500 text-sm">
-                        {s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}
+              <h2 className="font-semibold text-gray-800 mb-4">Zonas y horarios de atención</h2>
+              <div className="space-y-4">
+                {doctor.zones.map((z) => (
+                  <div key={z.id} className="border border-gray-100 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-2.5">
+                      <span className="text-sm font-medium text-gray-700">
+                        📍 {z.zone !== z.department ? `${z.zone}, ${z.department}` : z.department}
                       </span>
                     </div>
-                  ))}
+                    {z.schedules.length > 0 ? (
+                      <div className="divide-y divide-gray-50">
+                        {z.schedules
+                          .sort((a, b) => a.day_of_week - b.day_of_week)
+                          .map((s) => (
+                            <div key={s.id} className="flex items-center justify-between px-4 py-2">
+                              <span className="text-sm text-gray-700">{DAYS_OF_WEEK[s.day_of_week]}</span>
+                              <span className="text-sm text-gray-500">{s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <p className="px-4 py-2 text-sm text-gray-400">Consultar disponibilidad</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

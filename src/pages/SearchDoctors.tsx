@@ -27,13 +27,12 @@ export default function SearchDoctors() {
       .from('doctor_profiles')
       .select(`
         id,
-        specialty,
         bio,
         consultation_fee,
         is_active,
         profile:profiles!inner(id, full_name, phone, role, created_at),
-        zones:doctor_zones(*),
-        schedules:doctor_schedules(*)
+        specialties:doctor_specialties(specialty),
+        zones:doctor_zones(id, department, zone, schedules:doctor_zone_schedules(*))
       `)
       .eq('is_active', true)
 
@@ -47,7 +46,7 @@ export default function SearchDoctors() {
     let result = [...doctors]
 
     if (specialty) {
-      result = result.filter((d) => d.specialty === specialty)
+      result = result.filter((d) => d.specialties.some((s) => s.specialty === specialty))
     }
 
     if (department) {

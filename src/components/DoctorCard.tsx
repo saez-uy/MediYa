@@ -14,7 +14,8 @@ export default function DoctorCard({ doctor }: Props) {
     .slice(0, 2)
     .toUpperCase()
 
-  const activeDays = doctor.schedules.map((s) => DAYS_OF_WEEK[s.day_of_week].slice(0, 3)).join(', ')
+  const allDayIndices = [...new Set(doctor.zones.flatMap((z) => z.schedules.map((s) => s.day_of_week)))].sort((a, b) => a - b)
+  const activeDays = allDayIndices.map((d) => DAYS_OF_WEEK[d].slice(0, 3)).join(', ')
 
   const topZones = doctor.zones.slice(0, 3)
   const extraZones = doctor.zones.length - 3
@@ -29,7 +30,14 @@ export default function DoctorCard({ doctor }: Props) {
 
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 truncate">{doctor.profile.full_name}</h3>
-          <p className="text-primary-600 text-sm font-medium">{doctor.specialty}</p>
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {doctor.specialties.slice(0, 2).map((s) => (
+              <span key={s.specialty} className="text-primary-600 text-xs font-medium">{s.specialty}</span>
+            ))}
+            {doctor.specialties.length > 2 && (
+              <span className="text-gray-400 text-xs">+{doctor.specialties.length - 2} más</span>
+            )}
+          </div>
           {doctor.consultation_fee && (
             <p className="text-gray-500 text-sm">$ {doctor.consultation_fee.toLocaleString('es-UY')} la consulta</p>
           )}

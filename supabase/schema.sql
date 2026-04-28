@@ -156,3 +156,60 @@ CREATE POLICY "appointments_patient_insert" ON public.appointments
 -- El médico puede actualizar el estado del turno
 CREATE POLICY "appointments_doctor_update" ON public.appointments
   FOR UPDATE USING (auth.uid() = doctor_id);
+
+
+-- ============================================================
+-- MIGRACIÓN: Especialidades múltiples por médico
+-- ============================================================
+CREATE TABLE public.doctor_specialties (
+  id        uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  doctor_id uuid NOT NULL REFERENCES public.doctor_profiles(id) ON DELETE CASCADE,
+  specialty text NOT NULL,
+  UNIQUE (doctor_id, specialty)
+);
+
+ALTER TABLE public.doctor_specialties ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "doctor_specialties_select" ON public.doctor_specialties
+  FOR SELECT USING (true);
+
+CREATE POLICY "doctor_specialties_insert" ON public.doctor_specialties
+  FOR INSERT WITH CHECK (auth.uid() = doctor_id);
+
+CREATE POLICY "doctor_specialties_delete" ON public.doctor_specialties
+  FOR DELETE USING (auth.uid() = doctor_id);
+
+
+-- ============================================================
+-- MIGRACIÓN: Horarios por zona
+-- ============================================================
+CREATE TABLE public.doctor_zone_schedules (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  zone_id      uuid NOT NULL REFERENCES public.doctor_zones(id) ON DELETE CASCADE,
+  day_of_week  integer NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  start_time   time NOT NULL,
+  end_time     time NOT NULL,
+  CHECK (end_time > start_time),
+  UNIQUE (zone_id, day_of_week)
+);
+
+ALTER TABLE public.doctor_zone_schedules ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "doctor_zone_schedules_select" ON public.doctor_zone_schedules
+  FOR SELECT USING (true);
+
+CREATE POLICY "doctor_zone_schedules_insert" ON public.doctor_zone_schedules
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.doctor_zones
+      WHERE id = zone_id AND doctor_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "doctor_zone_schedules_delete" ON public.doctor_zone_schedules
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM public.doctor_zones
+      WHERE id = zone_id AND doctor_id = auth.uid()
+    )
+  );

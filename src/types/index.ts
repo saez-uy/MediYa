@@ -11,7 +11,6 @@ export interface Profile {
 
 export interface DoctorProfile {
   id: string
-  specialty: string
   bio: string | null
   consultation_fee: number | null
   is_active: boolean
@@ -25,12 +24,16 @@ export interface DoctorZone {
   zone: string
 }
 
-export interface DoctorSchedule {
+export interface DoctorZoneSchedule {
   id: string
-  doctor_id: string
+  zone_id: string
   day_of_week: number
   start_time: string
   end_time: string
+}
+
+export interface DoctorZoneWithSchedules extends DoctorZone {
+  schedules: DoctorZoneSchedule[]
 }
 
 export interface Appointment {
@@ -47,20 +50,12 @@ export interface Appointment {
 
 export interface DoctorWithDetails {
   id: string
-  specialty: string
   bio: string | null
   consultation_fee: number | null
   is_active: boolean
   profile: Profile
-  zones: DoctorZone[]
-  schedules: DoctorSchedule[]
-}
-
-export interface AppointmentWithDoctor extends Appointment {
-  doctor_profile: {
-    specialty: string
-    profile: { full_name: string; phone: string | null }
-  } | null
+  specialties: { specialty: string }[]
+  zones: DoctorZoneWithSchedules[]
 }
 
 export interface AppointmentWithPatient extends Appointment {

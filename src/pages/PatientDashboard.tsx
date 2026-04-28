@@ -55,13 +55,14 @@ export default function PatientDashboard() {
 
     const doctorIds = [...new Set(rows.map((r) => r.doctor_id))]
     const { data: specialties } = await supabase
-      .from('doctor_profiles')
-      .select('id, specialty')
-      .in('id', doctorIds)
+      .from('doctor_specialties')
+      .select('doctor_id, specialty')
+      .in('doctor_id', doctorIds)
 
-    const specialtyMap = Object.fromEntries(
-      (specialties ?? []).map((s) => [s.id, s.specialty])
-    )
+    const specialtyMap: Record<string, string> = {}
+    for (const s of specialties ?? []) {
+      if (!specialtyMap[s.doctor_id]) specialtyMap[s.doctor_id] = s.specialty
+    }
 
     setAppointments(rows.map((r) => ({ ...r, specialty: specialtyMap[r.doctor_id] })))
     setLoading(false)
