@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { STATUS_LABELS, DAYS_OF_WEEK } from '../lib/constants'
+import { STATUS_LABELS } from '../lib/constants'
 import type { AppointmentStatus } from '../types'
 
 interface AppointmentRow {
