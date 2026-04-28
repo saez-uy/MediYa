@@ -13,11 +13,8 @@ interface AppointmentRow {
   status: AppointmentStatus
   patient_notes: string | null
   created_at: string
-  doctor: {
-    full_name: string
-    phone: string | null
-    doctor_profiles: { specialty: string } | null
-  } | null
+  doctor: { full_name: string; phone: string | null } | null
+  specialty?: string
 }
 
 export default function PatientDashboard() {
@@ -32,6 +29,7 @@ export default function PatientDashboard() {
 
   async function fetchAppointments() {
     setLoading(true)
+
     const { data, error } = await supabase
       .from('appointments')
       .select(`
@@ -42,12 +40,30 @@ export default function PatientDashboard() {
         status,
         patient_notes,
         created_at,
-        doctor:profiles!appointments_doctor_id_fkey(full_name, phone, doctor_profiles(specialty))
+        doctor:profiles!appointments_doctor_id_fkey(full_name, phone)
       `)
       .eq('patient_id', user!.id)
       .order('requested_date', { ascending: false })
 
-    if (!error && data) setAppointments(data as unknown as AppointmentRow[])
+    if (error || !data) {
+      console.error('Error al obtener turnos:', error)
+      setLoading(false)
+      return
+    }
+
+    const rows = data as unknown as AppointmentRow[]
+
+    const doctorIds = [...new Set(rows.map((r) => r.doctor_id))]
+    const { data: specialties } = await supabase
+      .from('doctor_profiles')
+      .select('id, specialty')
+      .in('id', doctorIds)
+
+    const specialtyMap = Object.fromEntries(
+      (specialties ?? []).map((s) => [s.id, s.specialty])
+    )
+
+    setAppointments(rows.map((r) => ({ ...r, specialty: specialtyMap[r.doctor_id] })))
     setLoading(false)
   }
 
@@ -144,8 +160,8 @@ function PatientAppointmentCard({
             <span className={statusClass}>{STATUS_LABELS[appointment.status]}</span>
           </div>
           <h3 className="font-semibold text-gray-900">{appointment.doctor?.full_name ?? 'Médico'}</h3>
-          {appointment.doctor?.doctor_profiles?.specialty && (
-            <p className="text-primary-600 text-sm">{appointment.doctor.doctor_profiles.specialty}</p>
+          {appointment.specialty && (
+            <p className="text-primary-600 text-sm">{appointment.specialty}</p>
           )}
           <p className="text-gray-600 text-sm mt-2 capitalize">
             📅 {dateStr} a las {timeStr}
