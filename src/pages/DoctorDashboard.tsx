@@ -24,10 +24,37 @@ export default function DoctorDashboard() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<FilterTab>('all')
   const [updating, setUpdating] = useState<string | null>(null)
+  const [isActive, setIsActive] = useState<boolean | null>(null)
+  const [paymentLoading, setPaymentLoading] = useState(false)
 
   useEffect(() => {
-    if (user) fetchAppointments()
+    if (user) {
+      fetchAppointments()
+      checkActive()
+    }
   }, [user])
+
+  async function checkActive() {
+    const { data } = await supabase
+      .from('doctor_profiles')
+      .select('is_active')
+      .eq('id', user!.id)
+      .single()
+    setIsActive(data?.is_active ?? false)
+  }
+
+  async function handlePay() {
+    setPaymentLoading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('create-payment', {
+        body: { doctor_id: user!.id },
+      })
+      if (error) throw error
+      window.location.href = data.checkout_url
+    } catch {
+      setPaymentLoading(false)
+    }
+  }
 
   async function fetchAppointments() {
     setLoading(true)
@@ -88,6 +115,25 @@ export default function DoctorDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
+      {/* Banner pago pendiente */}
+      {isActive === false && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <p className="font-semibold text-yellow-800">⚠️ Tu cuenta está pendiente de activación</p>
+            <p className="text-yellow-700 text-sm mt-0.5">
+              Completá el pago para aparecer en las búsquedas y empezar a recibir turnos.
+            </p>
+          </div>
+          <button
+            onClick={handlePay}
+            disabled={paymentLoading}
+            className="btn-primary whitespace-nowrap flex-shrink-0"
+          >
+            {paymentLoading ? 'Redirigiendo...' : '💳 Activar cuenta'}
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
         <div>

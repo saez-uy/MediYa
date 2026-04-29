@@ -213,3 +213,29 @@ CREATE POLICY "doctor_zone_schedules_delete" ON public.doctor_zone_schedules
       WHERE id = zone_id AND doctor_id = auth.uid()
     )
   );
+
+
+-- ============================================================
+-- MIGRACIÓN: Pasarela de pago
+-- Cambiar default de is_active a false para nuevos médicos
+-- ============================================================
+ALTER TABLE public.doctor_profiles ALTER COLUMN is_active SET DEFAULT false;
+
+CREATE TABLE public.payments (
+  id                uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  doctor_id         uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  mp_preference_id  text,
+  mp_payment_id     text,
+  status            text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed')),
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+
+-- El médico puede ver sus propios pagos
+CREATE POLICY "payments_select_own" ON public.payments
+  FOR SELECT USING (auth.uid() = doctor_id);
+
+-- Solo el service role (webhook) puede insertar y actualizar
+CREATE POLICY "payments_insert_own" ON public.payments
+  FOR INSERT WITH CHECK (auth.uid() = doctor_id);

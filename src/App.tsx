@@ -10,6 +10,8 @@ import SearchDoctors from './pages/SearchDoctors'
 import DoctorPublicProfile from './pages/DoctorPublicProfile'
 import DoctorDashboard from './pages/DoctorDashboard'
 import PatientDashboard from './pages/PatientDashboard'
+import PaymentSuccess from './pages/PaymentSuccess'
+import PaymentError from './pages/PaymentError'
 
 export default function App() {
   const { user, profile, loading } = useAuth()
@@ -68,6 +70,9 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/pago/exito" element={<PaymentSuccess />} />
+          <Route path="/pago/error" element={<PaymentError />} />
+          <Route path="/pago/pendiente" element={<PaymentSuccess />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

@@ -38,6 +38,9 @@ export default function DoctorSetup() {
   const [fetching, setFetching] = useState(true)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [isActive, setIsActive] = useState(false)
+  const [needsPayment, setNeedsPayment] = useState(false)
+  const [paymentLoading, setPaymentLoading] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -51,6 +54,8 @@ export default function DoctorSetup() {
     if (dp) {
       setBio(dp.bio || '')
       setFee(dp.consultation_fee ? String(dp.consultation_fee) : '')
+      setIsActive(dp.is_active ?? false)
+      if (!dp.is_active) setNeedsPayment(false)
     }
 
     const { data: specs } = await supabase
@@ -148,7 +153,6 @@ export default function DoctorSetup() {
         id: user!.id,
         bio: bio || null,
         consultation_fee: fee ? parseInt(fee) : null,
-        is_active: true,
       })
       if (dpError) throw dpError
 
@@ -178,12 +182,34 @@ export default function DoctorSetup() {
         if (sError) throw sError
       }
 
-      setSaved(true)
-      setTimeout(() => navigate('/dashboard/medico'), 1000)
+      const { data: dpCheck } = await supabase
+        .from('doctor_profiles').select('is_active').eq('id', user!.id).single()
+
+      if (dpCheck?.is_active) {
+        setSaved(true)
+        setTimeout(() => navigate('/dashboard/medico'), 1000)
+      } else {
+        setNeedsPayment(true)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar. Intentá de nuevo.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handlePay() {
+    setPaymentLoading(true)
+    setError('')
+    try {
+      const { data, error } = await supabase.functions.invoke('create-payment', {
+        body: { doctor_id: user!.id },
+      })
+      if (error) throw error
+      window.location.href = data.checkout_url
+    } catch (err) {
+      setError('Error al iniciar el pago. Intentá de nuevo.')
+      setPaymentLoading(false)
     }
   }
 
@@ -418,14 +444,42 @@ export default function DoctorSetup() {
           </div>
         )}
 
-        <div className="flex gap-3 justify-end">
-          <button type="button" onClick={() => navigate('/dashboard/medico')} className="btn-secondary">
-            Cancelar
-          </button>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Guardando...' : 'Guardar perfil'}
-          </button>
-        </div>
+        {needsPayment && !saved && (
+          <div className="card border-primary-200 bg-primary-50 space-y-4">
+            <div>
+              <h3 className="font-semibold text-gray-900 text-lg">¡Perfil guardado! Último paso: activar tu cuenta</h3>
+              <p className="text-gray-600 text-sm mt-1">
+                Para aparecer en las búsquedas y recibir turnos, completá el pago de alta.
+              </p>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-primary-200">
+              <div>
+                <p className="font-medium text-gray-900">Alta médico en MediYa</p>
+                <p className="text-gray-500 text-sm">Acceso completo a la plataforma</p>
+              </div>
+              <p className="text-2xl font-bold text-primary-700">$ 500 <span className="text-sm font-normal text-gray-400">UYU</span></p>
+            </div>
+            <button
+              type="button"
+              onClick={handlePay}
+              disabled={paymentLoading}
+              className="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              {paymentLoading ? 'Redirigiendo...' : '💳 Pagar con MercadoPago'}
+            </button>
+          </div>
+        )}
+
+        {!needsPayment && (
+          <div className="flex gap-3 justify-end">
+            <button type="button" onClick={() => navigate('/dashboard/medico')} className="btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Guardando...' : 'Guardar perfil'}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   )
