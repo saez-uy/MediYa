@@ -7,13 +7,30 @@ export default function PaymentSuccess() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const doctorId = params.get('external_reference')
+  const paymentId = params.get('payment_id') ?? params.get('collection_id')
 
   useEffect(() => {
     if (!doctorId) { navigate('/'); return }
-    checkActivation()
+    activateAndCheck()
   }, [])
 
-  async function checkActivation() {
+  async function activateAndCheck() {
+    // If we have the payment_id from MP redirect, verify directly without waiting for webhook
+    if (paymentId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        await supabase.functions.invoke('mp-webhook', {
+          body: { payment_id: paymentId },
+          headers: session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {},
+        })
+      } catch {
+        // Ignore errors - we still poll below
+      }
+    }
+
+    // Poll until is_active = true (up to 15 seconds)
     let attempts = 0
     const interval = setInterval(async () => {
       const { data } = await supabase
@@ -29,7 +46,7 @@ export default function PaymentSuccess() {
         return
       }
 
-      if (++attempts >= 10) {
+      if (++attempts >= 8) {
         clearInterval(interval)
         setStatus('pending')
       }
@@ -59,6 +76,7 @@ export default function PaymentSuccess() {
             <h1 className="text-xl font-bold text-gray-900 mb-2">Pago en proceso</h1>
             <p className="text-gray-500 mb-6">
               Tu pago fue recibido y está siendo procesado. Tu cuenta se activará en breve.
+              Podés acceder a tu agenda y esperar la confirmación.
             </p>
             <button onClick={() => navigate('/dashboard/medico')} className="btn-primary">
               Ir a mi agenda
