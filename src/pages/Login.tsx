@@ -23,9 +23,19 @@ export default function Login() {
         .select('role')
         .eq('id', user!.id)
         .single()
-      if (profile?.role === 'doctor') navigate('/dashboard/medico')
-      else if (profile?.role === 'patient') navigate('/dashboard/paciente')
-      else navigate('/')
+      if (profile?.role === 'doctor') {
+        const { data: dp } = await supabase
+          .from('doctor_profiles')
+          .select('is_active')
+          .eq('id', user!.id)
+          .single()
+        if (!dp || dp.is_active === false) navigate('/medico/configurar')
+        else navigate('/dashboard/medico')
+      } else if (profile?.role === 'patient') {
+        navigate('/dashboard/paciente')
+      } else {
+        navigate('/')
+      }
     } catch (err) {
       setError(err instanceof Error ? 'Email o contraseña incorrectos.' : 'Error al ingresar.')
     } finally {

@@ -40,6 +40,7 @@ export default function DoctorSetup() {
   const [saved, setSaved] = useState(false)
   const [isActive, setIsActive] = useState(false)
   const [needsPayment, setNeedsPayment] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(false)
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function DoctorSetup() {
       setBio(dp.bio || '')
       setFee(dp.consultation_fee ? String(dp.consultation_fee) : '')
       setIsActive(dp.is_active ?? false)
+      if (dp.is_active === false) setNeedsPayment(true)
     }
 
     const { data: specs } = await supabase
@@ -152,6 +154,7 @@ export default function DoctorSetup() {
         id: user!.id,
         bio: bio || null,
         consultation_fee: fee ? parseInt(fee) : null,
+        is_active: isActive,
       })
       if (dpError) throw dpError
 
@@ -185,6 +188,7 @@ export default function DoctorSetup() {
         setSaved(true)
         setTimeout(() => navigate('/dashboard/medico'), 1000)
       } else {
+        setJustSaved(true)
         setNeedsPayment(true)
       }
     } catch (err) {
@@ -222,9 +226,15 @@ export default function DoctorSetup() {
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
         <div className="card max-w-md w-full space-y-6">
           <div className="text-center">
-            <p className="text-4xl mb-3">🎉</p>
-            <h2 className="text-2xl font-bold text-gray-900">¡Perfil guardado!</h2>
-            <p className="text-gray-500 mt-2">Un último paso para activar tu cuenta y empezar a recibir turnos.</p>
+            <p className="text-4xl mb-3">{justSaved ? '🎉' : '⚠️'}</p>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {justSaved ? '¡Perfil guardado!' : 'Cuenta pendiente de activación'}
+            </h2>
+            <p className="text-gray-500 mt-2">
+              {justSaved
+                ? 'Un último paso para activar tu cuenta y empezar a recibir turnos.'
+                : 'Completá el pago para aparecer en las búsquedas y recibir turnos.'}
+            </p>
           </div>
           <div className="flex items-center justify-between p-4 bg-primary-50 rounded-lg border border-primary-200">
             <div>
