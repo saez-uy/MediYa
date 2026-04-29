@@ -36,11 +36,11 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route
             path="/login"
-            element={user ? <Navigate to={getDashboardPath(profile?.role)} replace /> : <Login />}
+            element={user && profile ? <Navigate to={getDashboardPath(profile.role)} replace /> : <Login />}
           />
           <Route
             path="/registro"
-            element={user ? <Navigate to={getDashboardPath(profile?.role)} replace /> : <Register />}
+            element={user && profile ? <Navigate to={getDashboardPath(profile.role)} replace /> : <Register />}
           />
           <Route path="/buscar" element={<SearchDoctors />} />
           <Route path="/perfil/:id" element={<DoctorPublicProfile />} />
