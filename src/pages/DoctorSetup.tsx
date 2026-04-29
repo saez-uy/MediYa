@@ -55,7 +55,6 @@ export default function DoctorSetup() {
       setBio(dp.bio || '')
       setFee(dp.consultation_fee ? String(dp.consultation_fee) : '')
       setIsActive(dp.is_active ?? false)
-      if (!dp.is_active) setNeedsPayment(false)
     }
 
     const { data: specs } = await supabase
@@ -182,10 +181,7 @@ export default function DoctorSetup() {
         if (sError) throw sError
       }
 
-      const { data: dpCheck } = await supabase
-        .from('doctor_profiles').select('is_active').eq('id', user!.id).single()
-
-      if (dpCheck?.is_active) {
+      if (isActive) {
         setSaved(true)
         setTimeout(() => navigate('/dashboard/medico'), 1000)
       } else {
