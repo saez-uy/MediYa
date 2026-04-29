@@ -217,6 +217,43 @@ export default function DoctorSetup() {
     )
   }
 
+  if (needsPayment) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
+        <div className="card max-w-md w-full space-y-6">
+          <div className="text-center">
+            <p className="text-4xl mb-3">🎉</p>
+            <h2 className="text-2xl font-bold text-gray-900">¡Perfil guardado!</h2>
+            <p className="text-gray-500 mt-2">Un último paso para activar tu cuenta y empezar a recibir turnos.</p>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-primary-50 rounded-lg border border-primary-200">
+            <div>
+              <p className="font-medium text-gray-900">Alta médico en MediYa</p>
+              <p className="text-gray-500 text-sm">Acceso completo a la plataforma</p>
+            </div>
+            <p className="text-2xl font-bold text-primary-700">$ 500 <span className="text-sm font-normal text-gray-400">UYU</span></p>
+          </div>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+          )}
+          <button
+            onClick={handlePay}
+            disabled={paymentLoading}
+            className="btn-primary w-full flex items-center justify-center gap-2"
+          >
+            {paymentLoading ? 'Redirigiendo...' : '💳 Pagar con MercadoPago'}
+          </button>
+          <button
+            onClick={() => setNeedsPayment(false)}
+            className="btn-ghost w-full text-sm text-gray-500"
+          >
+            Volver a editar perfil
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
       <div className="mb-8">
@@ -440,42 +477,14 @@ export default function DoctorSetup() {
           </div>
         )}
 
-        {needsPayment && !saved && (
-          <div className="card border-primary-200 bg-primary-50 space-y-4">
-            <div>
-              <h3 className="font-semibold text-gray-900 text-lg">¡Perfil guardado! Último paso: activar tu cuenta</h3>
-              <p className="text-gray-600 text-sm mt-1">
-                Para aparecer en las búsquedas y recibir turnos, completá el pago de alta.
-              </p>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-primary-200">
-              <div>
-                <p className="font-medium text-gray-900">Alta médico en MediYa</p>
-                <p className="text-gray-500 text-sm">Acceso completo a la plataforma</p>
-              </div>
-              <p className="text-2xl font-bold text-primary-700">$ 500 <span className="text-sm font-normal text-gray-400">UYU</span></p>
-            </div>
-            <button
-              type="button"
-              onClick={handlePay}
-              disabled={paymentLoading}
-              className="btn-primary w-full flex items-center justify-center gap-2"
-            >
-              {paymentLoading ? 'Redirigiendo...' : '💳 Pagar con MercadoPago'}
-            </button>
-          </div>
-        )}
-
-        {!needsPayment && (
-          <div className="flex gap-3 justify-end">
-            <button type="button" onClick={() => navigate('/dashboard/medico')} className="btn-secondary">
-              Cancelar
-            </button>
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Guardando...' : 'Guardar perfil'}
-            </button>
-          </div>
-        )}
+        <div className="flex gap-3 justify-end">
+          <button type="button" onClick={() => navigate('/dashboard/medico')} className="btn-secondary">
+            Cancelar
+          </button>
+          <button type="submit" className="btn-primary" disabled={loading}>
+            {loading ? 'Guardando...' : 'Guardar perfil'}
+          </button>
+        </div>
       </form>
     </div>
   )
