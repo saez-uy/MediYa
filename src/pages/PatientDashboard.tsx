@@ -19,11 +19,18 @@ interface AppointmentRow {
   doctor_phone2?: string | null
 }
 
+function canCancelAppointment(date: string, time: string): boolean {
+  const appointmentDateTime = new Date(`${date}T${time}`)
+  const cutoff = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  return appointmentDateTime > cutoff
+}
+
 export default function PatientDashboard() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [appointments, setAppointments] = useState<AppointmentRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) fetchAppointments()
@@ -55,7 +62,6 @@ export default function PatientDashboard() {
     }
 
     const rows = data as unknown as AppointmentRow[]
-
     const doctorIds = [...new Set(rows.map((r) => r.doctor_id))]
 
     const [{ data: specialties }, { data: doctorPhones }] = await Promise.all([
@@ -81,9 +87,30 @@ export default function PatientDashboard() {
     setLoading(false)
   }
 
+  async function handleCancel(appt: AppointmentRow) {
+    if (!canCancelAppointment(appt.requested_date, appt.requested_time)) return
+    const confirmed = window.confirm('¿Seguro que querés cancelar este turno?')
+    if (!confirmed) return
+
+    setCancellingId(appt.id)
+    const { error } = await supabase
+      .from('appointments')
+      .update({ status: 'cancelled' })
+      .eq('id', appt.id)
+
+    if (error) {
+      alert('Error al cancelar. Intentá de nuevo.')
+    } else {
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === appt.id ? { ...a, status: 'cancelled' } : a))
+      )
+    }
+    setCancellingId(null)
+  }
+
   const pending = appointments.filter((a) => a.status === 'pending')
   const accepted = appointments.filter((a) => a.status === 'accepted')
-  const past = appointments.filter((a) => a.status === 'rejected')
+  const past = appointments.filter((a) => a.status === 'rejected' || a.status === 'cancelled')
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
@@ -113,13 +140,31 @@ export default function PatientDashboard() {
       ) : (
         <div className="space-y-8">
           {pending.length > 0 && (
-            <Section title="Pendientes de confirmación" appointments={pending} navigate={navigate} />
+            <Section
+              title="Pendientes de confirmación"
+              appointments={pending}
+              navigate={navigate}
+              onCancel={handleCancel}
+              cancellingId={cancellingId}
+            />
           )}
           {accepted.length > 0 && (
-            <Section title="Confirmadas" appointments={accepted} navigate={navigate} />
+            <Section
+              title="Confirmadas"
+              appointments={accepted}
+              navigate={navigate}
+              onCancel={handleCancel}
+              cancellingId={cancellingId}
+            />
           )}
           {past.length > 0 && (
-            <Section title="Rechazadas" appointments={past} navigate={navigate} />
+            <Section
+              title="Historial"
+              appointments={past}
+              navigate={navigate}
+              onCancel={handleCancel}
+              cancellingId={cancellingId}
+            />
           )}
         </div>
       )}
@@ -131,17 +176,27 @@ function Section({
   title,
   appointments,
   navigate,
+  onCancel,
+  cancellingId,
 }: {
   title: string
   appointments: AppointmentRow[]
   navigate: (path: string) => void
+  onCancel: (appt: AppointmentRow) => void
+  cancellingId: string | null
 }) {
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-700 mb-4">{title}</h2>
       <div className="space-y-4">
         {appointments.map((appt) => (
-          <PatientAppointmentCard key={appt.id} appointment={appt} navigate={navigate} />
+          <PatientAppointmentCard
+            key={appt.id}
+            appointment={appt}
+            navigate={navigate}
+            onCancel={onCancel}
+            cancelling={cancellingId === appt.id}
+          />
         ))}
       </div>
     </div>
@@ -151,13 +206,20 @@ function Section({
 function PatientAppointmentCard({
   appointment,
   navigate,
+  onCancel,
+  cancelling,
 }: {
   appointment: AppointmentRow
   navigate: (path: string) => void
+  onCancel: (appt: AppointmentRow) => void
+  cancelling: boolean
 }) {
   const date = new Date(appointment.requested_date + 'T12:00:00')
   const dateStr = date.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' })
   const timeStr = appointment.requested_time.slice(0, 5)
+
+  const isActive = appointment.status === 'pending' || appointment.status === 'accepted'
+  const showCancel = isActive && canCancelAppointment(appointment.requested_date, appointment.requested_time)
 
   const statusClass =
     appointment.status === 'pending'
@@ -203,6 +265,20 @@ function PatientAppointmentCard({
           {appointment.patient_notes && (
             <p className="text-gray-500 text-sm mt-2">
               <span className="font-medium">Motivo:</span> {appointment.patient_notes}
+            </p>
+          )}
+          {showCancel && (
+            <button
+              onClick={() => onCancel(appointment)}
+              disabled={cancelling}
+              className="mt-3 text-sm text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
+            >
+              {cancelling ? 'Cancelando...' : 'Cancelar turno'}
+            </button>
+          )}
+          {isActive && !showCancel && (
+            <p className="mt-3 text-xs text-gray-400">
+              No se puede cancelar con menos de 24 hs de anticipación.
             </p>
           )}
         </div>

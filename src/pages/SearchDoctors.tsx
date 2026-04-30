@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { SPECIALTIES, DEPARTMENTS, ZONES } from '../lib/constants'
+import { SPECIALTIES, DEPARTMENTS, ZONES, DAYS_OF_WEEK } from '../lib/constants'
 import type { DoctorWithDetails } from '../types'
 import DoctorCard from '../components/DoctorCard'
+
+const MODALITY_OPTIONS = [
+  { value: '', label: 'Cualquier modalidad' },
+  { value: 'presencial', label: '🏥 Presencial' },
+  { value: 'videollamada', label: '💻 Videollamada' },
+]
 
 export default function SearchDoctors() {
   const [doctors, setDoctors] = useState<DoctorWithDetails[]>([])
@@ -12,6 +18,8 @@ export default function SearchDoctors() {
   const [specialty, setSpecialty] = useState('')
   const [department, setDepartment] = useState('')
   const [zone, setZone] = useState('')
+  const [modality, setModality] = useState('')
+  const [dayOfWeek, setDayOfWeek] = useState('')
 
   useEffect(() => {
     fetchDoctors()
@@ -19,7 +27,7 @@ export default function SearchDoctors() {
 
   useEffect(() => {
     applyFilters()
-  }, [doctors, specialty, department, zone])
+  }, [doctors, specialty, department, zone, modality, dayOfWeek])
 
   async function fetchDoctors() {
     setLoading(true)
@@ -42,6 +50,14 @@ export default function SearchDoctors() {
     setLoading(false)
   }
 
+  function doctorSupportsModality(doctor: DoctorWithDetails, filter: string): boolean {
+    const schedules = doctor.zones.flatMap((z) => z.schedules)
+    return schedules.some((s) => {
+      const m = (s as unknown as { modality: string }).modality ?? 'presencial'
+      return m === filter || m === 'ambas'
+    })
+  }
+
   function applyFilters() {
     let result = [...doctors]
 
@@ -57,6 +73,19 @@ export default function SearchDoctors() {
       result = result.filter((d) => d.zones.some((z) => z.zone === zone))
     }
 
+    if (modality) {
+      result = result.filter((d) => doctorSupportsModality(d, modality))
+    }
+
+    if (dayOfWeek !== '') {
+      const day = parseInt(dayOfWeek)
+      result = result.filter((d) =>
+        d.zones.some((z) =>
+          z.schedules.some((s) => (s as unknown as { day_of_week: number }).day_of_week === day)
+        )
+      )
+    }
+
     setFiltered(result)
   }
 
@@ -69,9 +98,11 @@ export default function SearchDoctors() {
     setSpecialty('')
     setDepartment('')
     setZone('')
+    setModality('')
+    setDayOfWeek('')
   }
 
-  const hasFilters = specialty || department || zone
+  const hasFilters = specialty || department || zone || modality || dayOfWeek !== ''
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -82,14 +113,10 @@ export default function SearchDoctors() {
 
       {/* Filters */}
       <div className="card mb-8">
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="label">Especialidad</label>
-            <select
-              className="input"
-              value={specialty}
-              onChange={(e) => setSpecialty(e.target.value)}
-            >
+            <select className="input" value={specialty} onChange={(e) => setSpecialty(e.target.value)}>
               <option value="">Todas las especialidades</option>
               {SPECIALTIES.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -98,11 +125,7 @@ export default function SearchDoctors() {
           </div>
           <div>
             <label className="label">Departamento</label>
-            <select
-              className="input"
-              value={department}
-              onChange={(e) => handleDepartmentChange(e.target.value)}
-            >
+            <select className="input" value={department} onChange={(e) => handleDepartmentChange(e.target.value)}>
               <option value="">Todos los departamentos</option>
               {DEPARTMENTS.map((d) => (
                 <option key={d} value={d}>{d}</option>
@@ -122,6 +145,23 @@ export default function SearchDoctors() {
                 ZONES[department]?.map((z) => (
                   <option key={z} value={z}>{z}</option>
                 ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Modalidad</label>
+            <select className="input" value={modality} onChange={(e) => setModality(e.target.value)}>
+              {MODALITY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Disponible el</label>
+            <select className="input" value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)}>
+              <option value="">Cualquier día</option>
+              {DAYS_OF_WEEK.map((d, i) => (
+                <option key={i} value={String(i)}>{d}</option>
+              ))}
             </select>
           </div>
         </div>

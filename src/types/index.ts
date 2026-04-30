@@ -1,5 +1,5 @@
 export type UserRole = 'doctor' | 'patient'
-export type AppointmentStatus = 'pending' | 'accepted' | 'rejected'
+export type AppointmentStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled'
 export type Modality = 'presencial' | 'videollamada' | 'ambas'
 
 export interface Profile {
