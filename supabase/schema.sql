@@ -246,3 +246,10 @@ CREATE POLICY "payments_insert_own" ON public.payments
 -- ============================================================
 ALTER TABLE public.doctor_profiles
   ADD COLUMN IF NOT EXISTS mp_subscription_id text;
+
+
+-- ============================================================
+-- MIGRACIÓN: Teléfonos del médico
+-- ============================================================
+ALTER TABLE public.doctor_profiles
+  ADD COLUMN IF NOT EXISTS phone2 text;

@@ -127,13 +127,16 @@ export default function Register() {
                 />
               </div>
               <div>
-                <label className="label">Teléfono (opcional)</label>
+                <label className="label">
+                  Teléfono {role === 'doctor' ? '*' : '(opcional)'}
+                </label>
                 <input
                   type="tel"
                   className="input"
                   placeholder="099 123 456"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  required={role === 'doctor'}
                 />
               </div>
               <div>

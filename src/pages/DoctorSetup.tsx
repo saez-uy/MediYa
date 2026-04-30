@@ -31,6 +31,8 @@ export default function DoctorSetup() {
   const [specialties, setSpecialties] = useState<string[]>([])
   const [bio, setBio] = useState('')
   const [fee, setFee] = useState('')
+  const [phone1, setPhone1] = useState('')
+  const [phone2, setPhone2] = useState('')
   const [selectedZones, setSelectedZones] = useState<SelectedZone[]>([])
   const [zoneSchedules, setZoneSchedules] = useState<Record<string, ScheduleRow[]>>({})
   const [openDept, setOpenDept] = useState<string | null>('Montevideo')
@@ -53,10 +55,15 @@ export default function DoctorSetup() {
   async function loadExistingProfile() {
     setFetching(true)
 
+    const { data: profileData } = await supabase
+      .from('profiles').select('phone').eq('id', user!.id).single()
+    if (profileData) setPhone1(profileData.phone || '')
+
     const { data: dp } = await supabase.from('doctor_profiles').select('*').eq('id', user!.id).single()
     if (dp) {
       setBio(dp.bio || '')
       setFee(dp.consultation_fee ? String(dp.consultation_fee) : '')
+      setPhone2(dp.phone2 || '')
       setIsActive(dp.is_active ?? false)
       if (dp.is_active === false) setNeedsPayment(true)
     }
@@ -146,17 +153,21 @@ export default function DoctorSetup() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    if (!phone1.trim()) { setError('El teléfono de contacto es obligatorio.'); return }
     if (specialties.length === 0) { setError('Seleccioná al menos una especialidad.'); return }
     if (selectedZones.length === 0) { setError('Seleccioná al menos una zona de trabajo.'); return }
     setError('')
     setLoading(true)
 
     try {
+      await supabase.from('profiles').update({ phone: phone1.trim() }).eq('id', user!.id)
+
       const { error: dpError } = await supabase.from('doctor_profiles').upsert({
         id: user!.id,
         bio: bio || null,
         consultation_fee: fee ? parseInt(fee) : null,
         is_active: isActive,
+        phone2: phone2.trim() || null,
       })
       if (dpError) throw dpError
 
@@ -314,6 +325,30 @@ export default function DoctorSetup() {
         {/* Basic info */}
         <div className="card space-y-5">
           <h2 className="text-lg font-semibold text-gray-800">Información básica</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Teléfono de contacto *</label>
+              <input
+                type="tel"
+                className="input"
+                placeholder="099 123 456"
+                value={phone1}
+                onChange={(e) => setPhone1(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Teléfono alternativo (opcional)</label>
+              <input
+                type="tel"
+                className="input"
+                placeholder="2900 1234"
+                value={phone2}
+                onChange={(e) => setPhone2(e.target.value)}
+              />
+            </div>
+          </div>
 
           <div>
             <label className="label">Bio / Presentación</label>
