@@ -24,6 +24,24 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Modo test: activar directamente sin pasar por MercadoPago
+    if (mpAccessToken.startsWith('TEST-')) {
+      await supabase.from('doctor_profiles').upsert({
+        id: doctor_id,
+        is_active: true,
+        mp_subscription_id: 'test-mode',
+      })
+      await supabase.from('payments').insert({
+        doctor_id,
+        mp_preference_id: 'test-mode',
+        status: 'paid',
+      })
+      return new Response(
+        JSON.stringify({ test_mode: true, checkout_url: `${appUrl}/pago/exito?external_reference=${doctor_id}&status=approved` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Crear suscripción mensual en MercadoPago
     const preapprovalResp = await fetch('https://api.mercadopago.com/preapproval', {
       method: 'POST',
