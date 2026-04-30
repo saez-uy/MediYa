@@ -42,6 +42,8 @@ export default function DoctorSetup() {
   const [needsPayment, setNeedsPayment] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [verifyMsg, setVerifyMsg] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -198,6 +200,30 @@ export default function DoctorSetup() {
     }
   }
 
+  async function handleVerify() {
+    setVerifying(true)
+    setVerifyMsg('')
+    setError('')
+    try {
+      const { data, error } = await supabase.functions.invoke('mp-webhook', {
+        body: { verify_doctor: true },
+      })
+      if (error) throw error
+      if (data?.status === 'approved') {
+        setIsActive(true)
+        setNeedsPayment(false)
+        setSaved(true)
+        setTimeout(() => navigate('/dashboard/medico'), 1500)
+      } else {
+        setVerifyMsg('Tu pago todavía no fue acreditado. Si ya pagaste, esperá unos minutos e intentá de nuevo.')
+      }
+    } catch {
+      setVerifyMsg('Error al verificar. Intentá de nuevo.')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
   async function handlePay() {
     setPaymentLoading(true)
     setError('')
@@ -246,12 +272,25 @@ export default function DoctorSetup() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
           )}
+          {verifyMsg && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm">{verifyMsg}</div>
+          )}
+          {saved && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">¡Cuenta activada! Redirigiendo...</div>
+          )}
           <button
             onClick={handlePay}
-            disabled={paymentLoading}
+            disabled={paymentLoading || verifying}
             className="btn-primary w-full flex items-center justify-center gap-2"
           >
             {paymentLoading ? 'Redirigiendo...' : '💳 Pagar con MercadoPago'}
+          </button>
+          <button
+            onClick={handleVerify}
+            disabled={verifying || paymentLoading}
+            className="btn-secondary w-full flex items-center justify-center gap-2"
+          >
+            {verifying ? 'Verificando...' : '🔄 Ya pagué, verificar estado'}
           </button>
           <button
             onClick={() => setNeedsPayment(false)}
