@@ -43,6 +43,7 @@ export default function SearchDoctors() {
         zones:doctor_zones(id, department, zone, schedules:doctor_zone_schedules(*))
       `)
       .eq('is_active', true)
+      .eq('admin_enabled', true)
 
     if (!error && data) {
       setDoctors(data as unknown as DoctorWithDetails[])

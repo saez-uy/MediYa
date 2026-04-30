@@ -13,6 +13,7 @@ import PatientDashboard from './pages/PatientDashboard'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentError from './pages/PaymentError'
 import PatientProfile from './pages/PatientProfile'
+import Admin from './pages/Admin'
 
 export default function App() {
   const { user, profile, loading } = useAuth()
@@ -82,6 +83,7 @@ export default function App() {
           <Route path="/pago/exito" element={<PaymentSuccess />} />
           <Route path="/pago/error" element={<PaymentError />} />
           <Route path="/pago/pendiente" element={<PaymentSuccess />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

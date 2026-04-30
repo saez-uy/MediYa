@@ -39,6 +39,8 @@ export default function DoctorSetup() {
   const [phone2, setPhone2] = useState('')
   const [cajaProfesional, setCajaProfesional] = useState('')
   const [cajaProfesionalLocked, setCajaProfesionalLocked] = useState(false)
+  const [documento, setDocumento] = useState('')
+  const [documentoLocked, setDocumentoLocked] = useState(false)
   const [selectedZones, setSelectedZones] = useState<SelectedZone[]>([])
   const [zoneSchedules, setZoneSchedules] = useState<Record<string, ScheduleRow[]>>({})
   const [openDept, setOpenDept] = useState<string | null>('Montevideo')
@@ -75,6 +77,10 @@ export default function DoctorSetup() {
       if (dp.caja_profesional) {
         setCajaProfesional(dp.caja_profesional)
         setCajaProfesionalLocked(true)
+      }
+      if (dp.documento) {
+        setDocumento(dp.documento)
+        setDocumentoLocked(true)
       }
     }
 
@@ -181,6 +187,9 @@ export default function DoctorSetup() {
       }
       if (!cajaProfesionalLocked) {
         dpPayload.caja_profesional = cajaProfesional.trim() || null
+      }
+      if (!documentoLocked) {
+        dpPayload.documento = documento.trim() || null
       }
       const { error: dpError } = await supabase.from('doctor_profiles').upsert(dpPayload)
       if (dpError) throw dpError
@@ -362,6 +371,28 @@ export default function DoctorSetup() {
                 onChange={(e) => setPhone2(e.target.value)}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="label">
+              Número de documento (CI)
+              {documentoLocked && (
+                <span className="ml-2 text-xs font-normal text-gray-400">(no editable una vez registrado)</span>
+              )}
+            </label>
+            {documentoLocked ? (
+              <div className="input bg-gray-50 text-gray-600 cursor-not-allowed select-none">
+                {documento}
+              </div>
+            ) : (
+              <input
+                type="text"
+                className="input"
+                placeholder="Ej: 12345678"
+                value={documento}
+                onChange={(e) => setDocumento(e.target.value)}
+              />
+            )}
           </div>
 
           <div>
