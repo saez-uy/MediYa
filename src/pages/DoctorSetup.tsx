@@ -89,7 +89,7 @@ export default function DoctorSetup() {
         newZones.push({ department: z.department, zone: z.zone })
         const key = zoneKey(z.department, z.zone)
         newSchedules[key] = DAYS_OF_WEEK.map((_, i) => {
-          const match = (z.doctor_zone_schedules as { day_of_week: number; start_time: string; end_time: string }[])
+          const match = (z.doctor_zone_schedules as { day_of_week: number; start_time: string; end_time: string; modality: string }[])
             ?.find((s) => s.day_of_week === i)
           if (match) return { day_of_week: i, enabled: true, start_time: match.start_time.slice(0, 5), end_time: match.end_time.slice(0, 5), modality: (match.modality as Modality) ?? 'presencial' }
           return { day_of_week: i, enabled: false, start_time: '09:00', end_time: '17:00', modality: 'presencial' }
@@ -187,7 +187,7 @@ export default function DoctorSetup() {
         .select('id, department, zone')
       if (zError) throw zError
 
-      const scheduleRows: { zone_id: string; day_of_week: number; start_time: string; end_time: string }[] = []
+      const scheduleRows: { zone_id: string; day_of_week: number; start_time: string; end_time: string; modality: string }[] = []
       for (const z of newZones!) {
         const key = zoneKey(z.department, z.zone)
         const rows = (zoneSchedules[key] || []).filter((s) => s.enabled && s.start_time && s.end_time)
