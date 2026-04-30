@@ -37,6 +37,8 @@ export default function DoctorSetup() {
   const [fee, setFee] = useState('')
   const [phone1, setPhone1] = useState('')
   const [phone2, setPhone2] = useState('')
+  const [cajaProfesional, setCajaProfesional] = useState('')
+  const [cajaProfesionalLocked, setCajaProfesionalLocked] = useState(false)
   const [selectedZones, setSelectedZones] = useState<SelectedZone[]>([])
   const [zoneSchedules, setZoneSchedules] = useState<Record<string, ScheduleRow[]>>({})
   const [openDept, setOpenDept] = useState<string | null>('Montevideo')
@@ -70,6 +72,10 @@ export default function DoctorSetup() {
       setPhone2(dp.phone2 || '')
       setIsActive(dp.is_active ?? false)
       if (dp.is_active === false) setNeedsPayment(true)
+      if (dp.caja_profesional) {
+        setCajaProfesional(dp.caja_profesional)
+        setCajaProfesionalLocked(true)
+      }
     }
 
     const { data: specs } = await supabase
@@ -166,13 +172,17 @@ export default function DoctorSetup() {
     try {
       await supabase.from('profiles').update({ phone: phone1.trim() }).eq('id', user!.id)
 
-      const { error: dpError } = await supabase.from('doctor_profiles').upsert({
+      const dpPayload: Record<string, unknown> = {
         id: user!.id,
         bio: bio || null,
         consultation_fee: fee ? parseInt(fee) : null,
         is_active: isActive,
         phone2: phone2.trim() || null,
-      })
+      }
+      if (!cajaProfesionalLocked) {
+        dpPayload.caja_profesional = cajaProfesional.trim() || null
+      }
+      const { error: dpError } = await supabase.from('doctor_profiles').upsert(dpPayload)
       if (dpError) throw dpError
 
       await supabase.from('doctor_specialties').delete().eq('doctor_id', user!.id)
@@ -352,6 +362,28 @@ export default function DoctorSetup() {
                 onChange={(e) => setPhone2(e.target.value)}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="label">
+              Número de Caja Profesional
+              {cajaProfesionalLocked && (
+                <span className="ml-2 text-xs font-normal text-gray-400">(no editable una vez registrado)</span>
+              )}
+            </label>
+            {cajaProfesionalLocked ? (
+              <div className="input bg-gray-50 text-gray-600 cursor-not-allowed select-none">
+                {cajaProfesional}
+              </div>
+            ) : (
+              <input
+                type="text"
+                className="input"
+                placeholder="Ej: 123456"
+                value={cajaProfesional}
+                onChange={(e) => setCajaProfesional(e.target.value)}
+              />
+            )}
           </div>
 
           <div>
