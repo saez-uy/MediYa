@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
 interface DoctorRow {
@@ -17,6 +17,31 @@ export default function Admin() {
   const [loading, setLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
   const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  const [filterName, setFilterName] = useState('')
+  const [filterCI, setFilterCI] = useState('')
+  const [filterCaja, setFilterCaja] = useState('')
+  const [filterPago, setFilterPago] = useState('')
+
+  const filtered = useMemo(() => {
+    return doctors.filter((d) => {
+      if (filterName && !d.profile.full_name.toLowerCase().includes(filterName.toLowerCase())) return false
+      if (filterCI && !(d.documento ?? '').toLowerCase().includes(filterCI.toLowerCase())) return false
+      if (filterCaja && !(d.caja_profesional ?? '').toLowerCase().includes(filterCaja.toLowerCase())) return false
+      if (filterPago === 'pagado' && !d.is_active) return false
+      if (filterPago === 'pendiente' && d.is_active) return false
+      return true
+    })
+  }, [doctors, filterName, filterCI, filterCaja, filterPago])
+
+  const hasFilters = filterName || filterCI || filterCaja || filterPago
+
+  function clearFilters() {
+    setFilterName('')
+    setFilterCI('')
+    setFilterCaja('')
+    setFilterPago('')
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -108,11 +133,13 @@ export default function Admin() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
+    <div className="max-w-6xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Panel de administración</h1>
-          <p className="text-gray-500 mt-1">{doctors.length} médico{doctors.length !== 1 ? 's' : ''} registrado{doctors.length !== 1 ? 's' : ''}</p>
+          <p className="text-gray-500 mt-1">
+            {filtered.length} de {doctors.length} médico{doctors.length !== 1 ? 's' : ''}
+          </p>
         </div>
         <div className="flex gap-3">
           <button onClick={loadDoctors} className="btn-secondary text-sm" disabled={loading}>
@@ -124,12 +151,69 @@ export default function Admin() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="card mb-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="label">Nombre</label>
+            <input
+              type="text"
+              className="input"
+              placeholder="Buscar por nombre..."
+              value={filterName}
+              onChange={(e) => setFilterName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">CI</label>
+            <input
+              type="text"
+              className="input"
+              placeholder="Buscar por CI..."
+              value={filterCI}
+              onChange={(e) => setFilterCI(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Caja Profesional</label>
+            <input
+              type="text"
+              className="input"
+              placeholder="Buscar por nro. caja..."
+              value={filterCaja}
+              onChange={(e) => setFilterCaja(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Estado de pago</label>
+            <select
+              className="input"
+              value={filterPago}
+              onChange={(e) => setFilterPago(e.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="pagado">Pagado</option>
+              <option value="pendiente">Pendiente</option>
+            </select>
+          </div>
+        </div>
+        {hasFilters && (
+          <div className="mt-3">
+            <button onClick={clearFilters} className="text-sm text-primary-600 hover:underline">
+              Limpiar filtros
+            </button>
+          </div>
+        )}
+      </div>
+
       {loading && doctors.length === 0 ? (
         <div className="flex justify-center py-20">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600" />
         </div>
-      ) : doctors.length === 0 ? (
-        <div className="text-center py-20 text-gray-500">No hay médicos registrados.</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-20 text-gray-500">
+          {hasFilters ? 'Ningún médico coincide con los filtros.' : 'No hay médicos registrados.'}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-sm">
@@ -144,7 +228,7 @@ export default function Admin() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {doctors.map((doc) => (
+              {filtered.map((doc) => (
                 <tr key={doc.id} className={`hover:bg-gray-50 transition-colors ${!doc.admin_enabled ? 'opacity-50' : ''}`}>
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {doc.profile.full_name}
@@ -157,7 +241,7 @@ export default function Admin() {
                   <td className="px-4 py-3 text-gray-600">{doc.profile.phone ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3 text-center">
                     {doc.is_active ? (
-                      <span className="inline-block bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full">Activo</span>
+                      <span className="inline-block bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full">Pagado</span>
                     ) : (
                       <span className="inline-block bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full">Pendiente</span>
                     )}
