@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { SPECIALTIES, DAYS_OF_WEEK, ZONES, DEPARTMENTS } from '../lib/constants'
+import ChangePasswordForm from '../components/ChangePasswordForm'
 
 type Modality = 'presencial' | 'videollamada' | 'ambas'
 
@@ -582,6 +583,10 @@ export default function DoctorSetup() {
           </button>
         </div>
       </form>
+
+      <div className="mt-8">
+        <ChangePasswordForm />
+      </div>
     </div>
   )
 }

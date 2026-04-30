@@ -12,6 +12,7 @@ import DoctorDashboard from './pages/DoctorDashboard'
 import PatientDashboard from './pages/PatientDashboard'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentError from './pages/PaymentError'
+import PatientProfile from './pages/PatientProfile'
 
 export default function App() {
   const { user, profile, loading } = useAuth()
@@ -67,6 +68,14 @@ export default function App() {
             element={
               <ProtectedRoute role="patient">
                 <PatientDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/perfil/paciente"
+            element={
+              <ProtectedRoute role="patient">
+                <PatientProfile />
               </ProtectedRoute>
             }
           />

@@ -56,6 +56,9 @@ export default function Navbar() {
               <Link to="/dashboard/paciente" className="btn-ghost text-sm">
                 Mis turnos
               </Link>
+              <Link to="/perfil/paciente" className="btn-ghost text-sm">
+                Mi perfil
+              </Link>
               <button onClick={handleSignOut} className="btn-ghost text-sm">
                 Salir
               </button>
@@ -107,6 +110,9 @@ export default function Navbar() {
             <>
               <Link to="/dashboard/paciente" className="btn-ghost text-sm text-left" onClick={() => setMenuOpen(false)}>
                 Mis turnos
+              </Link>
+              <Link to="/perfil/paciente" className="btn-ghost text-sm text-left" onClick={() => setMenuOpen(false)}>
+                Mi perfil
               </Link>
               <button onClick={() => { handleSignOut(); setMenuOpen(false) }} className="btn-ghost text-sm text-left">
                 Salir
