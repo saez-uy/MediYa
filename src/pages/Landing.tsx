@@ -121,6 +121,38 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Contact */}
+      <section className="py-20 bg-white">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Contacto</h2>
+          <p className="text-gray-500 mb-10">
+            ¿Tenés alguna consulta o necesitás ayuda? Escribinos o llamanos.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-6">
+            <a
+              href="mailto:saez-uy@gmail.com"
+              className="flex items-center justify-center gap-3 bg-primary-50 border border-primary-100 rounded-xl px-8 py-5 hover:bg-primary-100 transition-colors group"
+            >
+              <span className="text-2xl">✉️</span>
+              <div className="text-left">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-0.5">Email</p>
+                <p className="text-primary-700 font-semibold group-hover:underline">saez-uy@gmail.com</p>
+              </div>
+            </a>
+            <a
+              href="tel:099987987"
+              className="flex items-center justify-center gap-3 bg-primary-50 border border-primary-100 rounded-xl px-8 py-5 hover:bg-primary-100 transition-colors group"
+            >
+              <span className="text-2xl">📞</span>
+              <div className="text-left">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-0.5">Teléfono</p>
+                <p className="text-primary-700 font-semibold group-hover:underline">099 987 987</p>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-10 text-center">
         <p className="text-lg font-semibold text-white mb-1">MediYa</p>
