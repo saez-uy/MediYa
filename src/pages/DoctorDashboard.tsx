@@ -10,6 +10,7 @@ interface AppointmentRow {
   requested_date: string
   requested_time: string
   status: AppointmentStatus
+  modality: 'presencial' | 'videollamada' | null
   patient_notes: string | null
   doctor_notes: string | null
   created_at: string
@@ -89,6 +90,7 @@ export default function DoctorDashboard() {
         requested_date,
         requested_time,
         status,
+        modality,
         patient_notes,
         doctor_notes,
         created_at,
@@ -299,6 +301,11 @@ function AppointmentCard({
           )}
           <p className="text-gray-600 text-sm mt-2 capitalize">
             📅 {dateStr} a las {timeStr}
+            {appointment.modality && (
+              <span className="ml-2 text-xs text-gray-400">
+                {appointment.modality === 'presencial' ? '· 🏥 Presencial' : '· 💻 Videollamada'}
+              </span>
+            )}
           </p>
           {appointment.patient_notes && (
             <p className="text-gray-500 text-sm mt-2 bg-gray-50 p-2.5 rounded-lg">

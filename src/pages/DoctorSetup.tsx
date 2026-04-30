@@ -4,11 +4,14 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { SPECIALTIES, DAYS_OF_WEEK, ZONES, DEPARTMENTS } from '../lib/constants'
 
+type Modality = 'presencial' | 'videollamada' | 'ambas'
+
 interface ScheduleRow {
   day_of_week: number
   enabled: boolean
   start_time: string
   end_time: string
+  modality: Modality
 }
 
 interface SelectedZone {
@@ -21,7 +24,7 @@ function zoneKey(dept: string, zone: string) {
 }
 
 function defaultSchedule(): ScheduleRow[] {
-  return DAYS_OF_WEEK.map((_, i) => ({ day_of_week: i, enabled: false, start_time: '09:00', end_time: '17:00' }))
+  return DAYS_OF_WEEK.map((_, i) => ({ day_of_week: i, enabled: false, start_time: '09:00', end_time: '17:00', modality: 'presencial' }))
 }
 
 export default function DoctorSetup() {
@@ -88,8 +91,8 @@ export default function DoctorSetup() {
         newSchedules[key] = DAYS_OF_WEEK.map((_, i) => {
           const match = (z.doctor_zone_schedules as { day_of_week: number; start_time: string; end_time: string }[])
             ?.find((s) => s.day_of_week === i)
-          if (match) return { day_of_week: i, enabled: true, start_time: match.start_time.slice(0, 5), end_time: match.end_time.slice(0, 5) }
-          return { day_of_week: i, enabled: false, start_time: '09:00', end_time: '17:00' }
+          if (match) return { day_of_week: i, enabled: true, start_time: match.start_time.slice(0, 5), end_time: match.end_time.slice(0, 5), modality: (match.modality as Modality) ?? 'presencial' }
+          return { day_of_week: i, enabled: false, start_time: '09:00', end_time: '17:00', modality: 'presencial' }
         })
       }
       setSelectedZones(newZones)
@@ -189,7 +192,7 @@ export default function DoctorSetup() {
         const key = zoneKey(z.department, z.zone)
         const rows = (zoneSchedules[key] || []).filter((s) => s.enabled && s.start_time && s.end_time)
         for (const row of rows) {
-          scheduleRows.push({ zone_id: z.id, day_of_week: row.day_of_week, start_time: row.start_time, end_time: row.end_time })
+          scheduleRows.push({ zone_id: z.id, day_of_week: row.day_of_week, start_time: row.start_time, end_time: row.end_time, modality: row.modality })
         }
       }
       if (scheduleRows.length > 0) {
@@ -525,7 +528,7 @@ export default function DoctorSetup() {
                           {DAYS_OF_WEEK[i]}
                         </span>
                         {row.enabled ? (
-                          <div className="flex items-center gap-2 flex-1">
+                          <div className="flex items-center gap-2 flex-1 flex-wrap">
                             <input
                               type="time"
                               className="input py-1.5 text-sm"
@@ -539,6 +542,15 @@ export default function DoctorSetup() {
                               value={row.end_time}
                               onChange={(e) => updateZoneSchedule(key, i, 'end_time', e.target.value)}
                             />
+                            <select
+                              className="input py-1.5 text-sm flex-shrink-0"
+                              value={row.modality}
+                              onChange={(e) => updateZoneSchedule(key, i, 'modality', e.target.value)}
+                            >
+                              <option value="presencial">🏥 Presencial</option>
+                              <option value="videollamada">💻 Videollamada</option>
+                              <option value="ambas">🏥💻 Ambas</option>
+                            </select>
                           </div>
                         ) : (
                           <span className="text-gray-400 text-sm">No disponible</span>

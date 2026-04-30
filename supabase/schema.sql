@@ -253,3 +253,15 @@ ALTER TABLE public.doctor_profiles
 -- ============================================================
 ALTER TABLE public.doctor_profiles
   ADD COLUMN IF NOT EXISTS phone2 text;
+
+
+-- ============================================================
+-- MIGRACIÓN: Modalidad de atención (presencial / videollamada / ambas)
+-- ============================================================
+ALTER TABLE public.doctor_zone_schedules
+  ADD COLUMN IF NOT EXISTS modality text NOT NULL DEFAULT 'presencial'
+  CHECK (modality IN ('presencial', 'videollamada', 'ambas'));
+
+ALTER TABLE public.appointments
+  ADD COLUMN IF NOT EXISTS modality text
+  CHECK (modality IN ('presencial', 'videollamada'));

@@ -16,6 +16,8 @@ export default function DoctorPublicProfile() {
 
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
+  const [modality, setModality] = useState<'presencial' | 'videollamada'>('presencial')
+  const [availableModality, setAvailableModality] = useState<'presencial' | 'videollamada' | 'ambas' | null>(null)
   const [notes, setNotes] = useState('')
   const [booking, setBooking] = useState(false)
   const [bookError, setBookError] = useState('')
@@ -66,10 +68,25 @@ export default function DoctorPublicProfile() {
     return slots.sort()
   }
 
+  function getModalityForDate(dateStr: string): 'presencial' | 'videollamada' | 'ambas' | null {
+    if (!doctor || !dateStr) return null
+    const ourDay = jsToOurDay(new Date(dateStr + 'T12:00:00').getDay())
+    const daySched = doctor.zones.flatMap((z) => z.schedules.filter((s) => s.day_of_week === ourDay))
+    if (daySched.length === 0) return null
+    const modalities = new Set(daySched.map((s) => s.modality))
+    if (modalities.has('ambas')) return 'ambas'
+    if (modalities.has('presencial') && modalities.has('videollamada')) return 'ambas'
+    if (modalities.has('videollamada')) return 'videollamada'
+    return 'presencial'
+  }
+
   function handleDateChange(newDate: string) {
     setDate(newDate)
     const slots = getTimeSlots(newDate)
     setTime(slots.length > 0 ? slots[0] : '')
+    const m = getModalityForDate(newDate)
+    setAvailableModality(m)
+    setModality(m === 'videollamada' ? 'videollamada' : 'presencial')
   }
 
   useEffect(() => {
@@ -110,6 +127,7 @@ export default function DoctorPublicProfile() {
         patient_id: user.id,
         requested_date: date,
         requested_time: time,
+        modality,
         patient_notes: notes || null,
       })
       if (error) throw error
@@ -211,7 +229,12 @@ export default function DoctorPublicProfile() {
                           .map((s) => (
                             <div key={s.id} className="flex items-center justify-between px-4 py-2">
                               <span className="text-sm text-gray-700">{DAYS_OF_WEEK[s.day_of_week]}</span>
-                              <span className="text-sm text-gray-500">{s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-500">{s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}</span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                                  {s.modality === 'presencial' ? '🏥' : s.modality === 'videollamada' ? '💻' : '🏥💻'}
+                                </span>
+                              </div>
                             </div>
                           ))}
                       </div>
@@ -330,6 +353,36 @@ export default function DoctorPublicProfile() {
                     </>
                   )
                 })()}
+
+                {/* Modalidad */}
+                {availableModality && (
+                  <div>
+                    <label className="label">Tipo de consulta</label>
+                    {availableModality === 'ambas' ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['presencial', 'videollamada'] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setModality(m)}
+                            className={`py-2.5 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                              modality === m
+                                ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            {m === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={`py-2.5 px-3 rounded-lg border text-sm font-medium border-primary-200 bg-primary-50 text-primary-700`}>
+                        {availableModality === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <label className="label">Motivo de consulta (opcional)</label>
                   <textarea

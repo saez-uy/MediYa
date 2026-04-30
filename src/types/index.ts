@@ -1,5 +1,6 @@
 export type UserRole = 'doctor' | 'patient'
 export type AppointmentStatus = 'pending' | 'accepted' | 'rejected'
+export type Modality = 'presencial' | 'videollamada' | 'ambas'
 
 export interface Profile {
   id: string
@@ -30,6 +31,7 @@ export interface DoctorZoneSchedule {
   day_of_week: number
   start_time: string
   end_time: string
+  modality: Modality
 }
 
 export interface DoctorZoneWithSchedules extends DoctorZone {
@@ -43,6 +45,7 @@ export interface Appointment {
   requested_date: string
   requested_time: string
   status: AppointmentStatus
+  modality: Modality | null
   patient_notes: string | null
   doctor_notes: string | null
   created_at: string
