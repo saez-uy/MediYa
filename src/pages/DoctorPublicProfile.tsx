@@ -21,6 +21,57 @@ export default function DoctorPublicProfile() {
   const [bookError, setBookError] = useState('')
   const [bookSuccess, setBookSuccess] = useState(false)
 
+  // día JS (0=dom) → día nuestro (0=lun)
+  function jsToOurDay(jsDay: number) { return (jsDay + 6) % 7 }
+
+  function getValidDates() {
+    if (!doctor) return []
+    const availableDays = new Set(
+      doctor.zones.flatMap((z) => z.schedules.map((s) => s.day_of_week))
+    )
+    if (availableDays.size === 0) return [] // sin horarios configurados → libre
+    const dates: { value: string; label: string }[] = []
+    const base = new Date()
+    for (let i = 1; i <= 60; i++) {
+      const d = new Date(base)
+      d.setDate(base.getDate() + i)
+      if (availableDays.has(jsToOurDay(d.getDay()))) {
+        dates.push({
+          value: d.toISOString().split('T')[0],
+          label: d.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' }),
+        })
+      }
+    }
+    return dates
+  }
+
+  function getTimeSlots(dateStr: string) {
+    if (!doctor || !dateStr) return []
+    const ourDay = jsToOurDay(new Date(dateStr + 'T12:00:00').getDay())
+    const daySchedules = doctor.zones.flatMap((z) =>
+      z.schedules.filter((s) => s.day_of_week === ourDay)
+    )
+    const slots: string[] = []
+    for (const sched of daySchedules) {
+      const [sh, sm] = sched.start_time.slice(0, 5).split(':').map(Number)
+      const [eh, em] = sched.end_time.slice(0, 5).split(':').map(Number)
+      let cur = sh * 60 + sm
+      const end = eh * 60 + em
+      while (cur < end) {
+        const slot = `${String(Math.floor(cur / 60)).padStart(2, '0')}:${String(cur % 60).padStart(2, '0')}`
+        if (!slots.includes(slot)) slots.push(slot)
+        cur += 30
+      }
+    }
+    return slots.sort()
+  }
+
+  function handleDateChange(newDate: string) {
+    setDate(newDate)
+    const slots = getTimeSlots(newDate)
+    setTime(slots.length > 0 ? slots[0] : '')
+  }
+
   useEffect(() => {
     if (id) fetchDoctor()
   }, [id])
@@ -214,29 +265,71 @@ export default function DoctorPublicProfile() {
                 </div>
               )}
               <form onSubmit={handleBook} className="space-y-4">
-                <div>
-                  <label className="label">Fecha deseada</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    min={today}
-                    required
-                    disabled={!user}
-                  />
-                </div>
-                <div>
-                  <label className="label">Hora aproximada</label>
-                  <input
-                    type="time"
-                    className="input"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    required
-                    disabled={!user}
-                  />
-                </div>
+                {(() => {
+                  const validDates = getValidDates()
+                  const timeSlots = getTimeSlots(date)
+                  const hasSchedule = validDates.length > 0
+                  return (
+                    <>
+                      <div>
+                        <label className="label">Fecha deseada</label>
+                        {hasSchedule ? (
+                          <select
+                            className="input"
+                            value={date}
+                            onChange={(e) => handleDateChange(e.target.value)}
+                            required
+                            disabled={!user}
+                          >
+                            <option value="">Seleccioná una fecha...</option>
+                            {validDates.map((d) => (
+                              <option key={d.value} value={d.value}>{d.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="date"
+                            className="input"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            min={today}
+                            required
+                            disabled={!user}
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <label className="label">Hora</label>
+                        {hasSchedule && date ? (
+                          timeSlots.length > 0 ? (
+                            <select
+                              className="input"
+                              value={time}
+                              onChange={(e) => setTime(e.target.value)}
+                              required
+                              disabled={!user}
+                            >
+                              {timeSlots.map((t) => (
+                                <option key={t} value={t}>{t} hs</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="text-sm text-gray-400 py-2">Sin horarios para ese día.</p>
+                          )
+                        ) : (
+                          <input
+                            type="time"
+                            className="input"
+                            value={time}
+                            onChange={(e) => setTime(e.target.value)}
+                            required={!hasSchedule}
+                            disabled={!user || (hasSchedule && !date)}
+                          />
+                        )}
+                      </div>
+                    </>
+                  )
+                })()}
                 <div>
                   <label className="label">Motivo de consulta (opcional)</label>
                   <textarea
