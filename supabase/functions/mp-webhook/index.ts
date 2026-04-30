@@ -14,34 +14,47 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const mpAccessToken = Deno.env.get('MP_ACCESS_TOKEN')!
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  async function activateDoctor(doctorId: string, mpPaymentId: string, mpPreferenceId: string) {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    await supabase.from('doctor_profiles').update({ is_active: true }).eq('id', doctorId)
+  async function activateDoctor(doctorId: string, subscriptionId: string) {
+    await supabase
+      .from('doctor_profiles')
+      .upsert({ id: doctorId, is_active: true, mp_subscription_id: subscriptionId })
     await supabase
       .from('payments')
-      .update({ mp_payment_id: mpPaymentId, status: 'paid' })
-      .eq('mp_preference_id', mpPreferenceId)
+      .update({ status: 'paid' })
+      .eq('mp_preference_id', subscriptionId)
+  }
+
+  async function deactivateDoctor(doctorId: string) {
+    await supabase
+      .from('doctor_profiles')
+      .update({ is_active: false })
+      .eq('id', doctorId)
+  }
+
+  async function handleSubscriptionEvent(subscriptionId: string) {
+    const resp = await fetch(`https://api.mercadopago.com/preapproval/${subscriptionId}`, {
+      headers: { 'Authorization': `Bearer ${mpAccessToken}` },
+    })
+    const sub = await resp.json()
+    const doctorId = sub.external_reference
+    if (!doctorId) return
+
+    if (sub.status === 'authorized') {
+      await activateDoctor(doctorId, subscriptionId)
+    } else if (sub.status === 'cancelled' || sub.status === 'paused') {
+      await deactivateDoctor(doctorId)
+    }
   }
 
   try {
-    // ── 1. IPN de MercadoPago (GET o POST con topic/type=payment) ──────────
-    let ipnPaymentId: string | null = null
-
-    if (req.method === 'GET') {
-      const url = new URL(req.url)
-      const topic = url.searchParams.get('topic') ?? url.searchParams.get('type')
-      if (topic === 'payment') {
-        ipnPaymentId = url.searchParams.get('id') ?? url.searchParams.get('data.id')
-      }
-    } else if (req.method === 'POST') {
+    if (req.method === 'POST') {
       const body = await req.json()
 
-      // ── 2. Verificación iniciada por el médico desde la app ───────────────
+      // ── Verificación iniciada por el médico desde la app (con JWT) ────────
       if (body.verify_doctor === true) {
         const authHeader = req.headers.get('Authorization') ?? ''
-        const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
         const { data: { user }, error: authError } = await supabase.auth.getUser(
           authHeader.replace('Bearer ', '')
         )
@@ -52,74 +65,78 @@ serve(async (req) => {
           })
         }
 
-        // Buscar el pago más reciente del médico
-        const { data: payment } = await supabase
-          .from('payments')
-          .select('mp_preference_id')
-          .eq('doctor_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-
-        if (!payment?.mp_preference_id) {
-          return new Response(JSON.stringify({ status: 'no_payment_found' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          })
-        }
-
-        // Buscar en MP si hay algún pago aprobado para esa preferencia
+        // Buscar suscripción activa del médico en MP
         const searchResp = await fetch(
-          `https://api.mercadopago.com/v1/payments/search?preference_id=${payment.mp_preference_id}&sort=date_created&criteria=desc&limit=5`,
+          `https://api.mercadopago.com/preapproval/search?external_reference=${user.id}&status=authorized&limit=1`,
           { headers: { 'Authorization': `Bearer ${mpAccessToken}` } }
         )
         const searchResult = await searchResp.json()
-        const approved = (searchResult.results ?? []).find((p: { status: string }) => p.status === 'approved')
+        const authorized = searchResult.results?.[0]
 
-        if (!approved) {
-          const latestStatus = searchResult.results?.[0]?.status ?? 'not_found'
-          return new Response(JSON.stringify({ status: latestStatus }), {
+        if (authorized) {
+          await activateDoctor(user.id, authorized.id)
+          return new Response(JSON.stringify({ status: 'authorized' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
         }
 
-        await activateDoctor(user.id, String(approved.id), payment.mp_preference_id)
-        return new Response(JSON.stringify({ status: 'approved' }), {
+        // También buscar sin filtro de status para ver el estado actual
+        const allResp = await fetch(
+          `https://api.mercadopago.com/preapproval/search?external_reference=${user.id}&limit=1`,
+          { headers: { 'Authorization': `Bearer ${mpAccessToken}` } }
+        )
+        const allResult = await allResp.json()
+        const latest = allResult.results?.[0]
+        const currentStatus = latest?.status ?? 'not_found'
+
+        return new Response(JSON.stringify({ status: currentStatus }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      // ── 3. Webhook POST estándar de MP ────────────────────────────────────
-      if (body.type === 'payment' || body.topic === 'payment') {
-        ipnPaymentId = String(body.data?.id ?? body.id ?? '')
-      }
+      // ── Webhook de MercadoPago ─────────────────────────────────────────────
+      const eventType = body.type ?? body.topic
 
-      // ── 4. Llamada directa con payment_id (desde PaymentSuccess) ─────────
-      if (body.payment_id) {
-        ipnPaymentId = String(body.payment_id)
+      if (eventType === 'subscription_preapproval') {
+        const subscriptionId = String(body.data?.id ?? body.id ?? '')
+        if (subscriptionId) await handleSubscriptionEvent(subscriptionId)
+
+      } else if (eventType === 'subscription_authorized_payment') {
+        // Pago mensual procesado — verificar si el pago fue rechazado
+        const paymentId = String(body.data?.id ?? '')
+        if (paymentId) {
+          const payResp = await fetch(
+            `https://api.mercadopago.com/authorized_payments/${paymentId}`,
+            { headers: { 'Authorization': `Bearer ${mpAccessToken}` } }
+          )
+          const authPayment = await payResp.json()
+          if (authPayment.preapproval_id) {
+            await handleSubscriptionEvent(authPayment.preapproval_id)
+          }
+        }
+
+      } else if (eventType === 'payment' || body.payment_id) {
+        // Fallback: pago directo (compatibilidad con flujo anterior)
+        const paymentId = String(body.data?.id ?? body.payment_id ?? body.id ?? '')
+        if (paymentId) {
+          const mpResp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+            headers: { 'Authorization': `Bearer ${mpAccessToken}` },
+          })
+          const payment = await mpResp.json()
+          if (payment.status === 'approved' && payment.external_reference) {
+            await activateDoctor(payment.external_reference, payment.preference_id ?? paymentId)
+          }
+        }
       }
     }
 
-    // ── Procesar payment_id obtenido por IPN o llamada directa ────────────
-    if (ipnPaymentId) {
-      const mpResp = await fetch(`https://api.mercadopago.com/v1/payments/${ipnPaymentId}`, {
-        headers: { 'Authorization': `Bearer ${mpAccessToken}` },
-      })
-      const mpPayment = await mpResp.json()
-
-      if (mpPayment.status === 'approved' && mpPayment.external_reference) {
-        await activateDoctor(
-          mpPayment.external_reference,
-          String(ipnPaymentId),
-          mpPayment.preference_id
-        )
-        return new Response(JSON.stringify({ status: 'approved' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+    if (req.method === 'GET') {
+      const url = new URL(req.url)
+      const topic = url.searchParams.get('topic') ?? url.searchParams.get('type')
+      const id = url.searchParams.get('id') ?? url.searchParams.get('data.id')
+      if ((topic === 'subscription_preapproval' || topic === 'preapproval') && id) {
+        await handleSubscriptionEvent(id)
       }
-
-      return new Response(JSON.stringify({ status: mpPayment.status ?? 'not_approved' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
     }
 
     return new Response(JSON.stringify({ status: 'ok' }), {

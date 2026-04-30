@@ -239,3 +239,10 @@ CREATE POLICY "payments_select_own" ON public.payments
 -- Solo el service role (webhook) puede insertar y actualizar
 CREATE POLICY "payments_insert_own" ON public.payments
   FOR INSERT WITH CHECK (auth.uid() = doctor_id);
+
+
+-- ============================================================
+-- MIGRACIÓN: Suscripciones mensuales MercadoPago
+-- ============================================================
+ALTER TABLE public.doctor_profiles
+  ADD COLUMN IF NOT EXISTS mp_subscription_id text;

@@ -25,7 +25,10 @@ export default function DoctorDashboard() {
   const [tab, setTab] = useState<FilterTab>('all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [isActive, setIsActive] = useState<boolean | null>(null)
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null)
   const [paymentLoading, setPaymentLoading] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [verifyMsg, setVerifyMsg] = useState('')
 
   useEffect(() => {
     if (user) {
@@ -37,10 +40,11 @@ export default function DoctorDashboard() {
   async function checkActive() {
     const { data } = await supabase
       .from('doctor_profiles')
-      .select('is_active')
+      .select('is_active, mp_subscription_id')
       .eq('id', user!.id)
       .single()
     setIsActive(data?.is_active ?? false)
+    setSubscriptionId(data?.mp_subscription_id ?? null)
   }
 
   async function handlePay() {
@@ -53,6 +57,26 @@ export default function DoctorDashboard() {
       window.location.href = data.checkout_url
     } catch {
       setPaymentLoading(false)
+    }
+  }
+
+  async function handleVerify() {
+    setVerifying(true)
+    setVerifyMsg('')
+    try {
+      const { data, error } = await supabase.functions.invoke('mp-webhook', {
+        body: { verify_doctor: true },
+      })
+      if (error) throw error
+      if (data?.status === 'authorized') {
+        setIsActive(true)
+      } else {
+        setVerifyMsg('Suscripción no autorizada todavía. Si ya completaste el pago, esperá unos minutos e intentá de nuevo.')
+      }
+    } catch {
+      setVerifyMsg('Error al verificar. Intentá de nuevo.')
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -115,22 +139,51 @@ export default function DoctorDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
-      {/* Banner pago pendiente */}
-      {isActive === false && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <p className="font-semibold text-yellow-800">⚠️ Tu cuenta está pendiente de activación</p>
-            <p className="text-yellow-700 text-sm mt-0.5">
-              Completá el pago para aparecer en las búsquedas y empezar a recibir turnos.
-            </p>
-          </div>
-          <button
-            onClick={handlePay}
-            disabled={paymentLoading}
-            className="btn-primary whitespace-nowrap flex-shrink-0"
+      {/* Banner suscripción activa */}
+      {isActive === true && subscriptionId && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between gap-4">
+          <p className="text-green-800 text-sm font-medium">✅ Suscripción mensual activa</p>
+          <a
+            href={`https://www.mercadopago.com.uy/subscriptions`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-green-700 text-sm underline hover:text-green-900 whitespace-nowrap"
           >
-            {paymentLoading ? 'Redirigiendo...' : '💳 Activar cuenta'}
-          </button>
+            Administrar suscripción
+          </a>
+        </div>
+      )}
+
+      {/* Banner suscripción pendiente */}
+      {isActive === false && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-300 rounded-xl flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-yellow-800">⚠️ Tu cuenta está pendiente de activación</p>
+              <p className="text-yellow-700 text-sm mt-0.5">
+                Suscribite para aparecer en las búsquedas y recibir turnos. $ 500 UYU/mes.
+              </p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={handleVerify}
+                disabled={verifying || paymentLoading}
+                className="btn-secondary text-sm whitespace-nowrap"
+              >
+                {verifying ? 'Verificando...' : '🔄 Ya pagué'}
+              </button>
+              <button
+                onClick={handlePay}
+                disabled={paymentLoading || verifying}
+                className="btn-primary text-sm whitespace-nowrap"
+              >
+                {paymentLoading ? 'Redirigiendo...' : '💳 Suscribirme'}
+              </button>
+            </div>
+          </div>
+          {verifyMsg && (
+            <p className="text-yellow-800 text-sm bg-yellow-100 px-3 py-2 rounded-lg">{verifyMsg}</p>
+          )}
         </div>
       )}
 

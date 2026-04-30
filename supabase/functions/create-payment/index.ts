@@ -21,49 +21,54 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const price = Number(Deno.env.get('SUBSCRIPTION_PRICE') ?? 500)
 
-    const prefResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Obtener el email del médico para MercadoPago
+    const { data: { user } } = await supabase.auth.admin.getUserById(doctor_id)
+    if (!user?.email) throw new Error('No se encontró el email del médico')
+
+    // Crear suscripción mensual en MercadoPago
+    const preapprovalResp = await fetch('https://api.mercadopago.com/preapproval', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${mpAccessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        items: [{
-          id: 'mediya-doctor-alta',
-          title: 'MediYa – Alta médico',
-          quantity: 1,
-          unit_price: price,
+        reason: 'MediYa – Suscripción mensual médico',
+        payer_email: user.email,
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: 'months',
+          transaction_amount: price,
           currency_id: 'UYU',
-        }],
-        back_urls: {
-          success: `${appUrl}/pago/exito`,
-          failure: `${appUrl}/pago/error`,
-          pending: `${appUrl}/pago/pendiente`,
         },
-        notification_url: `${supabaseUrl}/functions/v1/mp-webhook`,
+        back_url: `${appUrl}/pago/exito`,
         external_reference: doctor_id,
-        auto_return: 'approved',
+        notification_url: `${supabaseUrl}/functions/v1/mp-webhook`,
       }),
     })
 
-    const preference = await prefResponse.json()
-    if (!preference.id) throw new Error(preference.message ?? 'Error creando preferencia MP')
+    const preapproval = await preapprovalResp.json()
+    if (!preapproval.id) throw new Error(preapproval.message ?? 'Error creando suscripción MP')
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Guardar en tabla payments
     await supabase.from('payments').insert({
       doctor_id,
-      mp_preference_id: preference.id,
+      mp_preference_id: preapproval.id,
       status: 'pending',
     })
 
     return new Response(
       JSON.stringify({
-        checkout_url: preference.init_point,
-        sandbox_url: preference.sandbox_init_point,
+        checkout_url: preapproval.init_point,
+        sandbox_url: preapproval.sandbox_init_point,
+        subscription_id: preapproval.id,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
+    console.error('create-payment error:', err)
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : 'Error desconocido' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
