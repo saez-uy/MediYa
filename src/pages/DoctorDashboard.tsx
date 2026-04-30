@@ -51,7 +51,7 @@ export default function DoctorDashboard() {
     setPaymentLoading(true)
     try {
       const { data, error } = await supabase.functions.invoke('create-payment', {
-        body: { doctor_id: user!.id },
+        body: { doctor_id: user!.id, payer_email: user!.email },
       })
       if (error) throw error
       window.location.href = data.checkout_url

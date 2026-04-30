@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Navbar() {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, loading } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -28,7 +28,7 @@ export default function Navbar() {
           <Link to="/buscar" className="btn-ghost text-sm">
             Buscar médicos
           </Link>
-          {!user && (
+          {!loading && !user && (
             <>
               <Link to="/login" className="btn-ghost text-sm">
                 Ingresar
@@ -38,7 +38,7 @@ export default function Navbar() {
               </Link>
             </>
           )}
-          {user && profile?.role === 'doctor' && (
+          {!loading && user && profile?.role === 'doctor' && (
             <>
               <Link to="/dashboard/medico" className="btn-ghost text-sm">
                 Mi agenda
@@ -51,7 +51,7 @@ export default function Navbar() {
               </button>
             </>
           )}
-          {user && profile?.role === 'patient' && (
+          {!loading && user && profile?.role === 'patient' && (
             <>
               <Link to="/dashboard/paciente" className="btn-ghost text-sm">
                 Mis turnos
@@ -80,7 +80,7 @@ export default function Navbar() {
           <Link to="/buscar" className="btn-ghost text-sm text-left" onClick={() => setMenuOpen(false)}>
             Buscar médicos
           </Link>
-          {!user && (
+          {!loading && !user && (
             <>
               <Link to="/login" className="btn-ghost text-sm text-left" onClick={() => setMenuOpen(false)}>
                 Ingresar
@@ -90,7 +90,7 @@ export default function Navbar() {
               </Link>
             </>
           )}
-          {user && profile?.role === 'doctor' && (
+          {!loading && user && profile?.role === 'doctor' && (
             <>
               <Link to="/dashboard/medico" className="btn-ghost text-sm text-left" onClick={() => setMenuOpen(false)}>
                 Mi agenda
@@ -103,7 +103,7 @@ export default function Navbar() {
               </button>
             </>
           )}
-          {user && profile?.role === 'patient' && (
+          {!loading && user && profile?.role === 'patient' && (
             <>
               <Link to="/dashboard/paciente" className="btn-ghost text-sm text-left" onClick={() => setMenuOpen(false)}>
                 Mis turnos

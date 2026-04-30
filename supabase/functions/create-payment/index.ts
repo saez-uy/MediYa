@@ -12,8 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { doctor_id } = await req.json()
+    const { doctor_id, payer_email } = await req.json()
     if (!doctor_id) throw new Error('Falta doctor_id')
+    if (!payer_email) throw new Error('Falta payer_email')
 
     const mpAccessToken = Deno.env.get('MP_ACCESS_TOKEN')!
     const appUrl = Deno.env.get('APP_URL')!
@@ -22,10 +23,6 @@ serve(async (req) => {
     const price = Number(Deno.env.get('SUBSCRIPTION_PRICE') ?? 500)
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Obtener el email del médico para MercadoPago
-    const { data: { user } } = await supabase.auth.admin.getUserById(doctor_id)
-    if (!user?.email) throw new Error('No se encontró el email del médico')
 
     // Crear suscripción mensual en MercadoPago
     const preapprovalResp = await fetch('https://api.mercadopago.com/preapproval', {
@@ -36,7 +33,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         reason: 'MediYa – Suscripción mensual médico',
-        payer_email: user.email,
+        payer_email: payer_email,
         auto_recurring: {
           frequency: 1,
           frequency_type: 'months',
