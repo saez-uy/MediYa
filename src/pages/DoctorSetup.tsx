@@ -170,6 +170,8 @@ export default function DoctorSetup() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!phone1.trim()) { setError('El teléfono de contacto es obligatorio.'); return }
+    if (!documentoLocked && !documento.trim()) { setError('El número de documento (CI) es obligatorio.'); return }
+    if (!cajaProfesionalLocked && !cajaProfesional.trim()) { setError('El número de Caja Profesional es obligatorio.'); return }
     if (specialties.length === 0) { setError('Seleccioná al menos una especialidad.'); return }
     if (selectedZones.length === 0) { setError('Seleccioná al menos una zona de trabajo.'); return }
     setError('')
@@ -375,7 +377,7 @@ export default function DoctorSetup() {
 
           <div>
             <label className="label">
-              Número de documento (CI)
+              Número de documento (CI) {!documentoLocked && <span className="text-red-500">*</span>}
               {documentoLocked && (
                 <span className="ml-2 text-xs font-normal text-gray-400">(no editable una vez registrado)</span>
               )}
@@ -397,7 +399,7 @@ export default function DoctorSetup() {
 
           <div>
             <label className="label">
-              Número de Caja Profesional
+              Número de Caja Profesional {!cajaProfesionalLocked && <span className="text-red-500">*</span>}
               {cajaProfesionalLocked && (
                 <span className="ml-2 text-xs font-normal text-gray-400">(no editable una vez registrado)</span>
               )}
