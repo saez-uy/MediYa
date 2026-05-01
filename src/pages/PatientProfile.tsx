@@ -14,13 +14,14 @@ export default function PatientProfile() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    if (!phone.trim()) { setError('El teléfono es obligatorio.'); return }
     setSaving(true)
     setError('')
     setSaved(false)
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ phone: phone.trim() || null })
+        .update({ phone: phone.trim() })
         .eq('id', user!.id)
       if (error) throw error
       setSaved(true)
@@ -53,13 +54,14 @@ export default function PatientProfile() {
         </div>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="label">Teléfono (opcional)</label>
+            <label className="label">Teléfono *</label>
             <input
               type="tel"
               className="input"
               placeholder="099 123 456"
               value={phone}
               onChange={(e) => { setPhone(e.target.value); setSaved(false) }}
+              required
             />
           </div>
           {error && (

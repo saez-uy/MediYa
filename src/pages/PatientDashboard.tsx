@@ -14,9 +14,8 @@ interface AppointmentRow {
   modality: 'presencial' | 'videollamada' | null
   patient_notes: string | null
   created_at: string
-  doctor: { full_name: string; phone: string | null } | null
+  doctor: { full_name: string } | null
   specialty?: string
-  doctor_phone2?: string | null
 }
 
 function canCancelAppointment(date: string, time: string): boolean {
@@ -50,7 +49,7 @@ export default function PatientDashboard() {
         modality,
         patient_notes,
         created_at,
-        doctor:profiles!appointments_doctor_id_fkey(full_name, phone)
+        doctor:profiles!appointments_doctor_id_fkey(full_name)
       `)
       .eq('patient_id', user!.id)
       .order('requested_date', { ascending: false })
@@ -64,25 +63,19 @@ export default function PatientDashboard() {
     const rows = data as unknown as AppointmentRow[]
     const doctorIds = [...new Set(rows.map((r) => r.doctor_id))]
 
-    const [{ data: specialties }, { data: doctorPhones }] = await Promise.all([
-      supabase.from('doctor_specialties').select('doctor_id, specialty').in('doctor_id', doctorIds),
-      supabase.from('doctor_profiles').select('id, phone2').in('id', doctorIds),
-    ])
+    const { data: specialties } = await supabase
+      .from('doctor_specialties')
+      .select('doctor_id, specialty')
+      .in('doctor_id', doctorIds)
 
     const specialtyMap: Record<string, string> = {}
     for (const s of specialties ?? []) {
       if (!specialtyMap[s.doctor_id]) specialtyMap[s.doctor_id] = s.specialty
     }
 
-    const phone2Map: Record<string, string | null> = {}
-    for (const dp of doctorPhones ?? []) {
-      phone2Map[dp.id] = dp.phone2 ?? null
-    }
-
     setAppointments(rows.map((r) => ({
       ...r,
       specialty: specialtyMap[r.doctor_id],
-      doctor_phone2: phone2Map[r.doctor_id] ?? null,
     })))
     setLoading(false)
   }
@@ -259,18 +252,9 @@ function PatientAppointmentCard({
             )}
           </p>
           {appointment.status === 'accepted' && (
-            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg space-y-1">
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-green-800 text-sm font-medium">Turno confirmado</p>
-              {appointment.doctor?.phone ? (
-                <>
-                  <p className="text-green-700 text-sm">📞 {appointment.doctor.phone}</p>
-                  {appointment.doctor_phone2 && (
-                    <p className="text-green-700 text-sm">📞 {appointment.doctor_phone2}</p>
-                  )}
-                </>
-              ) : (
-                <p className="text-green-700 text-sm">El médico se va a contactar con vos a la brevedad.</p>
-              )}
+              <p className="text-green-700 text-sm">El médico se va a contactar con vos a la brevedad.</p>
             </div>
           )}
           {appointment.patient_notes && (

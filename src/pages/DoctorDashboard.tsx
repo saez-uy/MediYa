@@ -332,8 +332,14 @@ function AppointmentCard({
             </span>
           </div>
           <h3 className="font-semibold text-gray-900">{appointment.patient?.full_name ?? 'Paciente'}</h3>
-          {appointment.patient?.phone && appointment.status === 'accepted' && (
-            <p className="text-primary-600 text-sm mt-0.5">📞 {appointment.patient.phone}</p>
+          {appointment.status === 'accepted' && (
+            <div className="mt-2 p-2.5 bg-green-50 border border-green-200 rounded-lg space-y-0.5">
+              <p className="text-green-800 text-xs font-semibold uppercase tracking-wide">Contacto del paciente</p>
+              {appointment.patient?.phone
+                ? <p className="text-green-700 text-sm">📞 {appointment.patient.phone}</p>
+                : <p className="text-green-600 text-sm">Sin teléfono registrado</p>
+              }
+            </div>
           )}
           <p className="text-gray-600 text-sm mt-2 capitalize">
             📅 {dateStr} a las {timeStr}
