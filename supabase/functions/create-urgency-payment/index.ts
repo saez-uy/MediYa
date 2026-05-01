@@ -52,7 +52,7 @@ serve(async (req) => {
         .eq('id', appt.id)
       return json({
         test_mode: true,
-        checkout_url: `${appUrl}/pago/exito?type=urgency&appointment_id=${appt.id}`,
+        checkout_url: `${appUrl}/pago/exito?type=urgency&appointment_id=${appt.id}&payment_id=test`,
         appointment_id: appt.id,
       })
     }

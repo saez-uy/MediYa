@@ -23,17 +23,27 @@ export default function PaymentSuccess() {
 
   async function handleUrgencySuccess() {
     if (!appointmentId) { navigate('/'); return }
-    try {
-      await supabase
-        .from('appointments')
-        .update({ status: 'pending' })
-        .eq('id', appointmentId)
-        .eq('status', 'pending_payment')
-    } catch {
-      // Even if update fails, show success (webhook can handle it)
+
+    // If MP reported a non-approved status in the URL, show pending without calling server
+    const mpStatus = params.get('collection_status') ?? params.get('status')
+    if (mpStatus && mpStatus !== 'approved' && paymentId !== 'test') {
+      setStatus('pending')
+      return
     }
-    setStatus('active')
-    setTimeout(() => navigate('/dashboard/paciente'), 2500)
+
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-urgency-payment', {
+        body: { payment_id: paymentId, appointment_id: appointmentId },
+      })
+      if (error || !data?.verified) {
+        setStatus('pending')
+        return
+      }
+      setStatus('active')
+      setTimeout(() => navigate('/dashboard/paciente'), 2500)
+    } catch {
+      setStatus('pending')
+    }
   }
 
   async function activateAndCheck() {
