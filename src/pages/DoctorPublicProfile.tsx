@@ -24,6 +24,10 @@ export default function DoctorPublicProfile() {
   const [bookError, setBookError] = useState('')
   const [bookSuccess, setBookSuccess] = useState(false)
 
+  // Booked slot tracking
+  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set())
+  const [bookedTodaySlots, setBookedTodaySlots] = useState<Set<string>>(new Set())
+
   // Urgency booking state
   const [urgencyTime, setUrgencyTime] = useState('')
   const [urgencyModality, setUrgencyModality] = useState<'presencial' | 'videollamada'>('presencial')
@@ -92,17 +96,7 @@ export default function DoctorPublicProfile() {
     return 'presencial'
   }
 
-  function handleDateChange(newDate: string) {
-    setDate(newDate)
-    const slots = getTimeSlots(newDate)
-    setTime(slots.length > 0 ? slots[0] : '')
-    const m = getModalityForDate(newDate)
-    setAvailableModality(m)
-    setModality(m === 'videollamada' ? 'videollamada' : 'presencial')
-  }
-
-  // Returns future time slots for today only
-  function getTodaySlots() {
+  function getTodayAllSlots() {
     if (!doctor) return []
     const availableDays = new Set(doctor.zones.flatMap((z) => z.schedules.map((s) => s.day_of_week)))
     if (!availableDays.has(jsToOurDay(new Date().getDay()))) return []
@@ -114,17 +108,44 @@ export default function DoctorPublicProfile() {
     })
   }
 
+  async function loadBookedSlotsForDate(dateStr: string): Promise<Set<string>> {
+    const { data } = await supabase
+      .from('appointments')
+      .select('requested_time')
+      .eq('doctor_id', id!)
+      .eq('requested_date', dateStr)
+      .in('status', ['pending', 'accepted', 'pending_payment'])
+    return new Set((data ?? []).map((r: { requested_time: string }) => r.requested_time.slice(0, 5)))
+  }
+
+  async function handleDateChange(newDate: string) {
+    setDate(newDate)
+    setTime('')
+    const m = getModalityForDate(newDate)
+    setAvailableModality(m)
+    setModality(m === 'videollamada' ? 'videollamada' : 'presencial')
+
+    const booked = await loadBookedSlotsForDate(newDate)
+    setBookedSlots(booked)
+    const available = getTimeSlots(newDate).filter((s) => !booked.has(s))
+    setTime(available.length > 0 ? available[0] : '')
+  }
+
   useEffect(() => {
     if (id) fetchDoctor()
   }, [id])
 
   useEffect(() => {
-    const slots = getTodaySlots()
-    if (slots.length > 0) {
-      setUrgencyTime(slots[0])
-      const m = getModalityForDate(todayStr)
-      setUrgencyModality(m === 'videollamada' ? 'videollamada' : 'presencial')
-    }
+    if (!doctor || !id) return
+    loadBookedSlotsForDate(todayStr).then((booked) => {
+      setBookedTodaySlots(booked)
+      const slots = getTodayAllSlots().filter((s) => !booked.has(s))
+      if (slots.length > 0) {
+        setUrgencyTime(slots[0])
+        const m = getModalityForDate(todayStr)
+        setUrgencyModality(m === 'videollamada' ? 'videollamada' : 'presencial')
+      }
+    })
   }, [doctor])
 
   async function fetchDoctor() {
@@ -157,6 +178,17 @@ export default function DoctorPublicProfile() {
     setBookError('')
     setBooking(true)
     try {
+      // Pre-check: verify slot is still free (handles race conditions)
+      const freshBooked = await loadBookedSlotsForDate(date)
+      if (freshBooked.has(time)) {
+        setBookedSlots(freshBooked)
+        const available = getTimeSlots(date).filter((s) => !freshBooked.has(s))
+        setTime(available.length > 0 ? available[0] : '')
+        setBookError('Ese horario ya fue reservado. Por favor elegí otro.')
+        setBooking(false)
+        return
+      }
+
       const { error } = await supabase.from('appointments').insert({
         doctor_id: id,
         patient_id: user.id,
@@ -180,6 +212,17 @@ export default function DoctorPublicProfile() {
     setUrgencyError('')
     setUrgencyBooking(true)
     try {
+      // Pre-check urgency slot
+      const freshBooked = await loadBookedSlotsForDate(todayStr)
+      if (freshBooked.has(urgencyTime)) {
+        setBookedTodaySlots(freshBooked)
+        const available = getTodayAllSlots().filter((s) => !freshBooked.has(s))
+        setUrgencyTime(available.length > 0 ? available[0] : '')
+        setUrgencyError('Ese horario ya fue reservado. Por favor elegí otro.')
+        setUrgencyBooking(false)
+        return
+      }
+
       const { data, error } = await supabase.functions.invoke('create-urgency-payment', {
         body: {
           doctor_id: id,
@@ -220,9 +263,10 @@ export default function DoctorPublicProfile() {
 
   const initials = doctor.profile.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
   const isOwnProfile = user?.id === id
-  const todaySlots = getTodaySlots()
-  const todayModality = getModalityForDate(todayStr)
   const isPatient = profile?.role === 'patient' || !user
+
+  const availableTodaySlots = getTodayAllSlots().filter((s) => !bookedTodaySlots.has(s))
+  const todayModality = getModalityForDate(todayStr)
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
@@ -330,7 +374,7 @@ export default function DoctorPublicProfile() {
           ) : (
             <>
               {/* ⚡ Urgency: today's booking */}
-              {isPatient && todaySlots.length > 0 && doctor.accepts_same_day && (
+              {isPatient && availableTodaySlots.length > 0 && doctor.accepts_same_day && (
                 <div className="card border-2 border-amber-300 bg-amber-50 space-y-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -361,7 +405,7 @@ export default function DoctorPublicProfile() {
                         required
                         disabled={!user}
                       >
-                        {todaySlots.map((t) => (
+                        {availableTodaySlots.map((t) => (
                           <option key={t} value={t}>{t} hs</option>
                         ))}
                       </select>
@@ -439,8 +483,10 @@ export default function DoctorPublicProfile() {
                 <form onSubmit={handleBook} className="space-y-4">
                   {(() => {
                     const validDates = getValidDates()
-                    const timeSlots = getTimeSlots(date)
+                    const allTimeSlots = getTimeSlots(date)
+                    const availableTimeSlots = allTimeSlots.filter((s) => !bookedSlots.has(s))
                     const hasSchedule = validDates.length > 0
+                    const noSlotsLeft = hasSchedule && date && allTimeSlots.length > 0 && availableTimeSlots.length === 0
                     return (
                       <>
                         <div>
@@ -473,7 +519,11 @@ export default function DoctorPublicProfile() {
                         <div>
                           <label className="label">Hora</label>
                           {hasSchedule && date ? (
-                            timeSlots.length > 0 ? (
+                            noSlotsLeft ? (
+                              <p className="text-sm text-red-500 py-2">
+                                Sin horarios disponibles para ese día. Elegí otra fecha.
+                              </p>
+                            ) : availableTimeSlots.length > 0 ? (
                               <select
                                 className="input"
                                 value={time}
@@ -481,7 +531,7 @@ export default function DoctorPublicProfile() {
                                 required
                                 disabled={!user}
                               >
-                                {timeSlots.map((t) => (
+                                {availableTimeSlots.map((t) => (
                                   <option key={t} value={t}>{t} hs</option>
                                 ))}
                               </select>
