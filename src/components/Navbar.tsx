@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 export default function Navbar() {
   const { user, profile, signOut, loading } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const { dark, toggle: toggleDark } = useDarkMode()
 
   async function handleSignOut() {
     await signOut()
@@ -13,7 +15,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-700">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
@@ -66,9 +68,18 @@ export default function Navbar() {
           )}
         </div>
 
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleDark}
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+          title={dark ? 'Modo claro' : 'Modo oscuro'}
+        >
+          {dark ? '☀️' : '🌙'}
+        </button>
+
         {/* Mobile hamburger */}
         <button
-          className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+          className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
           onClick={() => setMenuOpen(!menuOpen)}
         >
           <div className="w-5 h-0.5 bg-gray-600 mb-1" />
@@ -79,7 +90,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden border-t border-gray-200 bg-white px-4 py-3 flex flex-col gap-2">
+        <div className="md:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 flex flex-col gap-2">
           <Link to="/buscar" className="btn-ghost text-sm text-left" onClick={() => setMenuOpen(false)}>
             Buscar médicos
           </Link>

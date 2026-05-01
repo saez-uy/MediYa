@@ -135,6 +135,7 @@ export default function DoctorPublicProfile() {
         bio,
         consultation_fee,
         is_active,
+        accepts_same_day,
         profile:profiles!inner(id, full_name, phone, role, created_at),
         specialties:doctor_specialties(specialty),
         zones:doctor_zones(id, department, zone, schedules:doctor_zone_schedules(*))
@@ -329,7 +330,7 @@ export default function DoctorPublicProfile() {
           ) : (
             <>
               {/* ⚡ Urgency: today's booking */}
-              {isPatient && todaySlots.length > 0 && (
+              {isPatient && todaySlots.length > 0 && doctor.accepts_same_day && (
                 <div className="card border-2 border-amber-300 bg-amber-50 space-y-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { SPECIALTIES, DAYS_OF_WEEK, ZONES, DEPARTMENTS } from '../lib/constants'
+import { SPECIALTIES, DAYS_OF_WEEK, ZONES, DEPARTMENTS, URGENCY_FEE } from '../lib/constants'
 import ChangePasswordForm from '../components/ChangePasswordForm'
 
 type Modality = 'presencial' | 'videollamada' | 'ambas'
@@ -41,6 +41,7 @@ export default function DoctorSetup() {
   const [cajaProfesionalLocked, setCajaProfesionalLocked] = useState(false)
   const [documento, setDocumento] = useState('')
   const [documentoLocked, setDocumentoLocked] = useState(false)
+  const [acceptsSameDay, setAcceptsSameDay] = useState(false)
   const [selectedZones, setSelectedZones] = useState<SelectedZone[]>([])
   const [zoneSchedules, setZoneSchedules] = useState<Record<string, ScheduleRow[]>>({})
   const [openDept, setOpenDept] = useState<string | null>('Montevideo')
@@ -73,6 +74,7 @@ export default function DoctorSetup() {
       setFee(dp.consultation_fee ? String(dp.consultation_fee) : '')
       setPhone2(dp.phone2 || '')
       setIsActive(dp.is_active ?? false)
+      setAcceptsSameDay(dp.accepts_same_day ?? false)
       if (dp.is_active === false) setNeedsPayment(true)
       if (dp.caja_profesional) {
         setCajaProfesional(dp.caja_profesional)
@@ -186,6 +188,7 @@ export default function DoctorSetup() {
         consultation_fee: fee ? parseInt(fee) : null,
         is_active: isActive,
         phone2: phone2.trim() || null,
+        accepts_same_day: acceptsSameDay,
       }
       if (!cajaProfesionalLocked) {
         dpPayload.caja_profesional = cajaProfesional.trim() || null
@@ -428,6 +431,22 @@ export default function DoctorSetup() {
               value={bio}
               onChange={(e) => setBio(e.target.value)}
             />
+          </div>
+
+          <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <input
+              type="checkbox"
+              id="acceptsSameDay"
+              checked={acceptsSameDay}
+              onChange={(e) => setAcceptsSameDay(e.target.checked)}
+              className="accent-amber-500 w-4 h-4 mt-0.5 flex-shrink-0"
+            />
+            <label htmlFor="acceptsSameDay" className="cursor-pointer">
+              <span className="text-sm font-medium text-amber-900">⚡ Acepto atender el mismo día</span>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Los pacientes podrán reservar un turno urgente para hoy abonando un cargo adicional de $ {URGENCY_FEE} UYU.
+              </p>
+            </label>
           </div>
 
           <div>
