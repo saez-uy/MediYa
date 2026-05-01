@@ -101,12 +101,17 @@ export default function DoctorPublicProfile() {
     setModality(m === 'videollamada' ? 'videollamada' : 'presencial')
   }
 
-  // Returns time slots for today if doctor works today
+  // Returns future time slots for today only
   function getTodaySlots() {
     if (!doctor) return []
     const availableDays = new Set(doctor.zones.flatMap((z) => z.schedules.map((s) => s.day_of_week)))
     if (!availableDays.has(jsToOurDay(new Date().getDay()))) return []
-    return getTimeSlots(todayStr)
+    const now = new Date()
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    return getTimeSlots(todayStr).filter((slot) => {
+      const [h, m] = slot.split(':').map(Number)
+      return h * 60 + m > currentMinutes
+    })
   }
 
   useEffect(() => {
