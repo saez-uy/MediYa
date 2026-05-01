@@ -77,7 +77,7 @@ function emailAppointmentAccepted(opts: {
 }
 
 function emailAppointmentRejected(opts: {
-  doctorName: string; when: string; appUrl: string
+  doctorName: string; when: string; reason: string | null; appUrl: string
 }) {
   return wrap(`
     <p style="margin:0 0 8px;font-size:20px;font-weight:700;color:#111827;">Tu turno no pudo ser confirmado</p>
@@ -85,6 +85,7 @@ function emailAppointmentRejected(opts: {
     <table cellpadding="0" cellspacing="0" style="width:100%;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
       ${tRow('Médico', opts.doctorName)}
       ${tRow('Fecha y hora', opts.when)}
+      ${opts.reason ? tRow('Motivo', opts.reason) : ''}
     </table>
     <p style="margin:0 0 24px;color:#374151;font-size:14px;">Podés buscar otro médico disponible.</p>
     <a href="${opts.appUrl}/buscar" style="display:inline-block;background:#0d9488;color:#fff;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;">Buscar médicos</a>
@@ -197,7 +198,7 @@ serve(async (req) => {
         if (patientEmail) await send(
           patientEmail,
           'Tu turno no pudo confirmarse — MediYa',
-          emailAppointmentRejected({ doctorName, when, appUrl }),
+          emailAppointmentRejected({ doctorName, when, reason: record.doctor_notes ?? null, appUrl }),
         )
       }
 

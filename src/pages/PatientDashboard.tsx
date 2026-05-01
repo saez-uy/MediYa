@@ -13,6 +13,7 @@ interface AppointmentRow {
   status: AppointmentStatus
   modality: 'presencial' | 'videollamada' | null
   patient_notes: string | null
+  doctor_notes: string | null
   created_at: string
   doctor: { full_name: string } | null
   specialty?: string
@@ -48,6 +49,7 @@ export default function PatientDashboard() {
         status,
         modality,
         patient_notes,
+        doctor_notes,
         created_at,
         doctor:profiles!appointments_doctor_id_fkey(full_name)
       `)
@@ -261,6 +263,11 @@ function PatientAppointmentCard({
             <p className="text-gray-500 text-sm mt-2">
               <span className="font-medium">Motivo:</span> {appointment.patient_notes}
             </p>
+          )}
+          {appointment.status === 'rejected' && appointment.doctor_notes && (
+            <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm"><span className="font-medium">Motivo de rechazo:</span> {appointment.doctor_notes}</p>
+            </div>
           )}
           {isPendingPayment && (
             <p className="mt-3 text-xs text-amber-600 font-medium">

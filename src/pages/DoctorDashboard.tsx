@@ -136,17 +136,19 @@ export default function DoctorDashboard() {
     setLoading(false)
   }
 
-  async function updateStatus(appointmentId: string, status: AppointmentStatus) {
+  async function updateStatus(appointmentId: string, status: AppointmentStatus, doctorNotes?: string) {
     setUpdating(appointmentId)
+    const payload: Record<string, unknown> = { status }
+    if (doctorNotes !== undefined) payload.doctor_notes = doctorNotes || null
     const { error } = await supabase
       .from('appointments')
-      .update({ status })
+      .update(payload)
       .eq('id', appointmentId)
       .eq('doctor_id', user!.id)
 
     if (!error) {
       setAppointments((prev) =>
-        prev.map((a) => (a.id === appointmentId ? { ...a, status } : a))
+        prev.map((a) => (a.id === appointmentId ? { ...a, status, doctor_notes: doctorNotes ?? a.doctor_notes } : a))
       )
     }
     setUpdating(null)
@@ -416,7 +418,7 @@ export default function DoctorDashboard() {
                   key={appt.id}
                   appointment={appt}
                   onAccept={() => updateStatus(appt.id, 'accepted')}
-                  onReject={() => updateStatus(appt.id, 'rejected')}
+                  onReject={(reason) => updateStatus(appt.id, 'rejected', reason)}
                   updating={updating === appt.id}
                 />
               ))}
@@ -430,80 +432,52 @@ export default function DoctorDashboard() {
 
 /* ── Calendar chip (compact) ── */
 function CalendarChip({
-  appointment,
-  expanded,
-  onToggle,
-  onAccept,
-  onReject,
-  updating,
+  appointment, expanded, onToggle, onAccept, onReject, updating,
 }: {
-  appointment: AppointmentRow
-  expanded: boolean
-  onToggle: () => void
-  onAccept: () => void
-  onReject: () => void
-  updating: boolean
+  appointment: AppointmentRow; expanded: boolean; onToggle: () => void
+  onAccept: () => void; onReject: (reason: string) => void; updating: boolean
 }) {
+  const [showReject, setShowReject] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
   const timeStr = appointment.requested_time.slice(0, 5)
   const isPending = appointment.status === 'pending'
   const isAccepted = appointment.status === 'accepted'
-
-  const chipBg = isPending
-    ? 'bg-yellow-50 border-yellow-300'
-    : isAccepted
-    ? 'bg-green-50 border-green-300'
-    : 'bg-gray-50 border-gray-200'
-
-  const timeBadge = isPending
-    ? 'bg-yellow-400 text-white'
-    : isAccepted
-    ? 'bg-green-500 text-white'
-    : 'bg-gray-400 text-white'
+  const chipBg = isPending ? 'bg-yellow-50 border-yellow-300' : isAccepted ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
+  const timeBadge = isPending ? 'bg-yellow-400 text-white' : isAccepted ? 'bg-green-500 text-white' : 'bg-gray-400 text-white'
 
   return (
     <div className={`rounded-lg border ${chipBg} overflow-hidden`}>
-      <button
-        onClick={onToggle}
-        className="w-full text-left p-1.5 flex items-center gap-1.5"
-      >
-        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${timeBadge} whitespace-nowrap`}>
-          {timeStr}
-        </span>
+      <button onClick={onToggle} className="w-full text-left p-1.5 flex items-center gap-1.5">
+        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${timeBadge} whitespace-nowrap`}>{timeStr}</span>
         <span className="text-xs text-gray-700 font-medium truncate leading-tight">
           {appointment.patient?.full_name?.split(' ')[0] ?? 'Paciente'}
         </span>
       </button>
-
       {expanded && (
         <div className="px-2 pb-2 space-y-1.5 border-t border-gray-200 pt-1.5">
           <p className="text-xs font-semibold text-gray-800">{appointment.patient?.full_name ?? 'Paciente'}</p>
-          {isAccepted && appointment.patient?.phone && (
-            <p className="text-xs text-green-700">📞 {appointment.patient.phone}</p>
-          )}
-          {appointment.modality && (
-            <p className="text-xs text-gray-500">
-              {appointment.modality === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
-            </p>
-          )}
-          {appointment.patient_notes && (
-            <p className="text-xs text-gray-500 italic">"{appointment.patient_notes}"</p>
-          )}
-          {isPending && (
+          {isAccepted && appointment.patient?.phone && <p className="text-xs text-green-700">📞 {appointment.patient.phone}</p>}
+          {appointment.modality && <p className="text-xs text-gray-500">{appointment.modality === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}</p>}
+          {appointment.patient_notes && <p className="text-xs text-gray-500 italic">"{appointment.patient_notes}"</p>}
+          {isPending && !showReject && (
             <div className="flex gap-1 pt-0.5">
-              <button
-                onClick={onAccept}
-                disabled={updating}
-                className="flex-1 text-xs bg-primary-600 text-white py-1 rounded font-medium hover:bg-primary-700 disabled:opacity-50"
-              >
-                Confirmar
-              </button>
-              <button
-                onClick={onReject}
-                disabled={updating}
-                className="flex-1 text-xs bg-red-600 text-white py-1 rounded font-medium hover:bg-red-700 disabled:opacity-50"
-              >
-                Rechazar
-              </button>
+              <button onClick={onAccept} disabled={updating} className="flex-1 text-xs bg-primary-600 text-white py-1 rounded font-medium hover:bg-primary-700 disabled:opacity-50">Confirmar</button>
+              <button onClick={() => setShowReject(true)} disabled={updating} className="flex-1 text-xs bg-red-600 text-white py-1 rounded font-medium hover:bg-red-700 disabled:opacity-50">Rechazar</button>
+            </div>
+          )}
+          {isPending && showReject && (
+            <div className="space-y-1.5 pt-0.5">
+              <textarea className="input text-xs resize-none" rows={2} placeholder="Motivo (opcional)..."
+                value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+              <div className="flex gap-1">
+                <button onClick={() => { onReject(rejectReason); setShowReject(false) }} disabled={updating}
+                  className="flex-1 text-xs bg-red-600 text-white py-1 rounded font-medium hover:bg-red-700 disabled:opacity-50">
+                  Confirmar rechazo
+                </button>
+                <button onClick={() => setShowReject(false)} className="flex-1 text-xs bg-gray-200 text-gray-700 py-1 rounded font-medium hover:bg-gray-300">
+                  Cancelar
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -512,26 +486,18 @@ function CalendarChip({
   )
 }
 
-/* ── List card (unchanged) ── */
+/* ── List card ── */
 function AppointmentCard({
-  appointment,
-  onAccept,
-  onReject,
-  updating,
+  appointment, onAccept, onReject, updating,
 }: {
-  appointment: AppointmentRow
-  onAccept: () => void
-  onReject: () => void
-  updating: boolean
+  appointment: AppointmentRow; onAccept: () => void; onReject: (reason: string) => void; updating: boolean
 }) {
+  const [showReject, setShowReject] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
   const date = new Date(appointment.requested_date + 'T12:00:00')
   const dateStr = date.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' })
   const timeStr = appointment.requested_time.slice(0, 5)
-
-  const statusClass =
-    appointment.status === 'pending' ? 'badge-pending'
-    : appointment.status === 'accepted' ? 'badge-accepted'
-    : 'badge-rejected'
+  const statusClass = appointment.status === 'pending' ? 'badge-pending' : appointment.status === 'accepted' ? 'badge-accepted' : 'badge-rejected'
 
   return (
     <div className="card">
@@ -539,9 +505,7 @@ function AppointmentCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2">
             <span className={statusClass}>{STATUS_LABELS[appointment.status]}</span>
-            <span className="text-gray-400 text-xs">
-              Solicitado el {new Date(appointment.created_at).toLocaleDateString('es-UY')}
-            </span>
+            <span className="text-gray-400 text-xs">Solicitado el {new Date(appointment.created_at).toLocaleDateString('es-UY')}</span>
           </div>
           <h3 className="font-semibold text-gray-900">{appointment.patient?.full_name ?? 'Paciente'}</h3>
           {appointment.status === 'accepted' && (
@@ -549,33 +513,36 @@ function AppointmentCard({
               <p className="text-green-800 text-xs font-semibold uppercase tracking-wide">Contacto del paciente</p>
               {appointment.patient?.phone
                 ? <p className="text-green-700 text-sm">📞 {appointment.patient.phone}</p>
-                : <p className="text-green-600 text-sm">Sin teléfono registrado</p>
-              }
+                : <p className="text-green-600 text-sm">Sin teléfono registrado</p>}
             </div>
           )}
           <p className="text-gray-600 text-sm mt-2 capitalize">
             📅 {dateStr} a las {timeStr}
-            {appointment.modality && (
-              <span className="ml-2 text-xs text-gray-400">
-                {appointment.modality === 'presencial' ? '· 🏥 Presencial' : '· 💻 Videollamada'}
-              </span>
-            )}
+            {appointment.modality && <span className="ml-2 text-xs text-gray-400">{appointment.modality === 'presencial' ? '· 🏥 Presencial' : '· 💻 Videollamada'}</span>}
           </p>
           {appointment.patient_notes && (
             <p className="text-gray-500 text-sm mt-2 bg-gray-50 p-2.5 rounded-lg">
               <span className="font-medium">Motivo:</span> {appointment.patient_notes}
             </p>
           )}
+          {showReject && (
+            <div className="mt-3 space-y-2">
+              <textarea className="input resize-none text-sm" rows={2} placeholder="Motivo de rechazo (opcional)..."
+                value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} autoFocus />
+              <div className="flex gap-2">
+                <button onClick={() => { onReject(rejectReason); setShowReject(false) }} disabled={updating}
+                  className="btn-danger text-sm py-2 px-4">
+                  {updating ? 'Rechazando...' : 'Confirmar rechazo'}
+                </button>
+                <button onClick={() => setShowReject(false)} className="btn-ghost text-sm py-2 px-4">Cancelar</button>
+              </div>
+            </div>
+          )}
         </div>
-
-        {appointment.status === 'pending' && (
+        {appointment.status === 'pending' && !showReject && (
           <div className="flex gap-2 flex-shrink-0">
-            <button onClick={onAccept} disabled={updating} className="btn-primary text-sm py-2 px-4">
-              Confirmar
-            </button>
-            <button onClick={onReject} disabled={updating} className="btn-danger text-sm py-2 px-4">
-              Rechazar
-            </button>
+            <button onClick={onAccept} disabled={updating} className="btn-primary text-sm py-2 px-4">Confirmar</button>
+            <button onClick={() => setShowReject(true)} disabled={updating} className="btn-danger text-sm py-2 px-4">Rechazar</button>
           </div>
         )}
       </div>

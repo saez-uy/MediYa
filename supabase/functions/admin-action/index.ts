@@ -37,6 +37,7 @@ serve(async (req) => {
           admin_enabled,
           caja_profesional,
           documento,
+          mp_subscription_id,
           profile:profiles!inner(full_name, phone, created_at)
         `)
         .order('created_at', { ascending: false })
@@ -53,6 +54,26 @@ serve(async (req) => {
 
       if (error) throw error
       return json({ ok: true })
+    }
+
+    if (action === 'list_appointments') {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          requested_date,
+          requested_time,
+          status,
+          modality,
+          created_at,
+          patient:profiles!appointments_patient_id_fkey(full_name),
+          doctor:profiles!appointments_doctor_id_fkey(full_name)
+        `)
+        .order('requested_date', { ascending: false })
+        .order('requested_time', { ascending: false })
+
+      if (error) throw error
+      return json({ appointments: data })
     }
 
     return json({ error: 'Acción no válida' }, 400)

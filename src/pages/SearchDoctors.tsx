@@ -20,6 +20,7 @@ export default function SearchDoctors() {
   const [zone, setZone] = useState('')
   const [modality, setModality] = useState('')
   const [dayOfWeek, setDayOfWeek] = useState('')
+  const [urgencyOnly, setUrgencyOnly] = useState(false)
 
   useEffect(() => {
     fetchDoctors()
@@ -27,7 +28,7 @@ export default function SearchDoctors() {
 
   useEffect(() => {
     applyFilters()
-  }, [doctors, specialty, department, zone, modality, dayOfWeek])
+  }, [doctors, specialty, department, zone, modality, dayOfWeek, urgencyOnly])
 
   async function fetchDoctors() {
     setLoading(true)
@@ -38,6 +39,7 @@ export default function SearchDoctors() {
         bio,
         consultation_fee,
         is_active,
+        accepts_same_day,
         profile:profiles!inner(id, full_name, phone, role, created_at),
         specialties:doctor_specialties(specialty),
         zones:doctor_zones(id, department, zone, schedules:doctor_zone_schedules(*))
@@ -87,6 +89,10 @@ export default function SearchDoctors() {
       )
     }
 
+    if (urgencyOnly) {
+      result = result.filter((d) => d.accepts_same_day)
+    }
+
     setFiltered(result)
   }
 
@@ -101,9 +107,10 @@ export default function SearchDoctors() {
     setZone('')
     setModality('')
     setDayOfWeek('')
+    setUrgencyOnly(false)
   }
 
-  const hasFilters = specialty || department || zone || modality || dayOfWeek !== ''
+  const hasFilters = specialty || department || zone || modality || dayOfWeek !== '' || urgencyOnly
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -164,6 +171,18 @@ export default function SearchDoctors() {
                 <option key={i} value={String(i)}>{d}</option>
               ))}
             </select>
+          </div>
+          <div className="flex items-center gap-3 pt-5">
+            <input
+              type="checkbox"
+              id="urgency-filter"
+              checked={urgencyOnly}
+              onChange={(e) => setUrgencyOnly(e.target.checked)}
+              className="w-4 h-4 accent-primary-600 cursor-pointer"
+            />
+            <label htmlFor="urgency-filter" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+              ⚡ Solo turnos urgentes
+            </label>
           </div>
         </div>
         {hasFilters && (
