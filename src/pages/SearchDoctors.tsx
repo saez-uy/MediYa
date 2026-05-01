@@ -14,6 +14,7 @@ export default function SearchDoctors() {
   const [doctors, setDoctors] = useState<DoctorWithDetails[]>([])
   const [filtered, setFiltered] = useState<DoctorWithDetails[]>([])
   const [loading, setLoading] = useState(true)
+  const [ratingMap, setRatingMap] = useState<Record<string, { avg: number; count: number }>>({})
 
   const [specialty, setSpecialty] = useState('')
   const [department, setDepartment] = useState('')
@@ -48,7 +49,29 @@ export default function SearchDoctors() {
       .eq('admin_enabled', true)
 
     if (!error && data) {
-      setDoctors(data as unknown as DoctorWithDetails[])
+      const docs = data as unknown as DoctorWithDetails[]
+      setDoctors(docs)
+
+      // Fetch ratings for all fetched doctors
+      const ids = docs.map((d) => d.id)
+      if (ids.length > 0) {
+        const { data: reviews } = await supabase
+          .from('doctor_reviews')
+          .select('doctor_id, rating')
+          .in('doctor_id', ids)
+
+        const map: Record<string, { sum: number; count: number }> = {}
+        for (const r of reviews ?? []) {
+          if (!map[r.doctor_id]) map[r.doctor_id] = { sum: 0, count: 0 }
+          map[r.doctor_id].sum += r.rating
+          map[r.doctor_id].count++
+        }
+        const avgMap: Record<string, { avg: number; count: number }> = {}
+        for (const [id, v] of Object.entries(map)) {
+          avgMap[id] = { avg: v.sum / v.count, count: v.count }
+        }
+        setRatingMap(avgMap)
+      }
     }
     setLoading(false)
   }
@@ -217,7 +240,7 @@ export default function SearchDoctors() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((doctor) => (
-            <DoctorCard key={doctor.id} doctor={doctor} />
+            <DoctorCard key={doctor.id} doctor={doctor} rating={ratingMap[doctor.id]} />
           ))}
         </div>
       )}

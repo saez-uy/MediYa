@@ -4,6 +4,14 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { DAYS_OF_WEEK, URGENCY_FEE } from '../lib/constants'
 import type { DoctorWithDetails } from '../types'
+import { StarDisplay } from '../components/StarRating'
+
+interface DoctorReview {
+  rating: number
+  comment: string | null
+  created_at: string
+  patient: { full_name: string } | null
+}
 
 export default function DoctorPublicProfile() {
   const { id } = useParams<{ id: string }>()
@@ -13,6 +21,7 @@ export default function DoctorPublicProfile() {
   const [doctor, setDoctor] = useState<DoctorWithDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [reviews, setReviews] = useState<DoctorReview[]>([])
 
   // Normal booking state
   const [date, setDate] = useState('')
@@ -166,9 +175,18 @@ export default function DoctorPublicProfile() {
 
     if (error || !data) {
       setNotFound(true)
-    } else {
-      setDoctor(data as unknown as DoctorWithDetails)
+      setLoading(false)
+      return
     }
+    setDoctor(data as unknown as DoctorWithDetails)
+
+    const { data: reviewData } = await supabase
+      .from('doctor_reviews')
+      .select('rating, comment, created_at, patient:profiles!doctor_reviews_patient_id_fkey(full_name)')
+      .eq('doctor_id', id)
+      .order('created_at', { ascending: false })
+
+    setReviews((reviewData as unknown as DoctorReview[]) ?? [])
     setLoading(false)
   }
 
@@ -345,6 +363,40 @@ export default function DoctorPublicProfile() {
               </div>
             </div>
           )}
+          {/* Reviews */}
+          <div className="card">
+            <h2 className="font-semibold text-gray-800 mb-4">Reseñas de pacientes</h2>
+            {reviews.length === 0 ? (
+              <p className="text-gray-400 text-sm">Este médico aún no tiene reseñas.</p>
+            ) : (
+              <>
+                {(() => {
+                  const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+                  return (
+                    <div className="mb-4 pb-4 border-b border-gray-100">
+                      <StarDisplay avg={avg} count={reviews.length} size="md" />
+                    </div>
+                  )
+                })()}
+                <div className="space-y-4">
+                  {reviews.map((r, i) => (
+                    <div key={i} className="space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-gray-700">
+                          {r.patient?.full_name ?? 'Paciente'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(r.created_at).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <StarDisplay avg={r.rating} count={1} size="sm" />
+                      {r.comment && <p className="text-gray-600 text-sm italic">"{r.comment}"</p>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Right: booking forms */}
