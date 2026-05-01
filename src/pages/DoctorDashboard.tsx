@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { STATUS_LABELS } from '../lib/constants'
@@ -20,12 +20,14 @@ interface AppointmentRow {
 type FilterTab = 'all' | AppointmentStatus
 
 export default function DoctorDashboard() {
-  const { user, profile } = useAuth()
+  const { user, profile, signOut } = useAuth()
+  const navigate = useNavigate()
   const [appointments, setAppointments] = useState<AppointmentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<FilterTab>('all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [isActive, setIsActive] = useState<boolean | null>(null)
+  const [adminEnabled, setAdminEnabled] = useState<boolean | null>(null)
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
@@ -41,10 +43,11 @@ export default function DoctorDashboard() {
   async function checkActive() {
     const { data } = await supabase
       .from('doctor_profiles')
-      .select('is_active, mp_subscription_id')
+      .select('is_active, admin_enabled, mp_subscription_id')
       .eq('id', user!.id)
       .single()
     setIsActive(data?.is_active ?? false)
+    setAdminEnabled(data?.admin_enabled ?? false)
     setSubscriptionId(data?.mp_subscription_id ?? null)
   }
 
@@ -138,6 +141,39 @@ export default function DoctorDashboard() {
     { key: 'accepted', label: 'Confirmadas', count: accepted.length },
     { key: 'rejected', label: 'Rechazadas', count: rejected.length },
   ]
+
+  if (adminEnabled === false) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
+        <div className="card max-w-md w-full text-center space-y-6">
+          <div>
+            <p className="text-5xl mb-4">⏳</p>
+            <h2 className="text-2xl font-bold text-gray-900">Cuenta en revisión</h2>
+            <p className="text-gray-600 mt-3 leading-relaxed">
+              Una vez finalizada la validación de sus datos, quedará su cuenta activada.
+            </p>
+            <p className="text-gray-400 text-sm mt-2">
+              Si tenés alguna consulta escribinos a{' '}
+              <a href="mailto:saez-uy@gmail.com" className="text-primary-600 hover:underline">
+                saez-uy@gmail.com
+              </a>
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Link to="/medico/configurar" className="btn-secondary text-sm">
+              Ver mi perfil
+            </Link>
+            <button
+              onClick={async () => { await signOut(); navigate('/') }}
+              className="btn-ghost text-sm text-gray-500"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
