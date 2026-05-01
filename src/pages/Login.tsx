@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const sessionExpired = searchParams.get('sesion') === 'vencida'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -55,6 +57,12 @@ export default function Login() {
             </Link>
           </p>
         </div>
+
+        {sessionExpired && (
+          <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm text-center">
+            Tu sesión cerró por inactividad. Ingresá nuevamente.
+          </div>
+        )}
 
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-5">

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
+import InactivityGuard from './components/InactivityGuard'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -33,7 +34,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <InactivityGuard>
       <Navbar />
       <main className="min-h-screen pt-16">
         <Routes>
@@ -87,6 +88,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-    </>
+    </InactivityGuard>
   )
 }
