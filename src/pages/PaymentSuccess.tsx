@@ -6,16 +6,37 @@ export default function PaymentSuccess() {
   const [status, setStatus] = useState<'checking' | 'active' | 'pending'>('checking')
   const navigate = useNavigate()
   const [params] = useSearchParams()
+
+  const type = params.get('type')
+  const appointmentId = params.get('appointment_id')
   const doctorId = params.get('external_reference')
   const paymentId = params.get('payment_id') ?? params.get('collection_id')
 
   useEffect(() => {
-    if (!doctorId) { navigate('/'); return }
-    activateAndCheck()
+    if (type === 'urgency') {
+      handleUrgencySuccess()
+    } else {
+      if (!doctorId) { navigate('/'); return }
+      activateAndCheck()
+    }
   }, [])
 
+  async function handleUrgencySuccess() {
+    if (!appointmentId) { navigate('/'); return }
+    try {
+      await supabase
+        .from('appointments')
+        .update({ status: 'pending' })
+        .eq('id', appointmentId)
+        .eq('status', 'pending_payment')
+    } catch {
+      // Even if update fails, show success (webhook can handle it)
+    }
+    setStatus('active')
+    setTimeout(() => navigate('/dashboard/paciente'), 2500)
+  }
+
   async function activateAndCheck() {
-    // If we have the payment_id from MP redirect, verify directly without waiting for webhook
     if (paymentId) {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -26,11 +47,10 @@ export default function PaymentSuccess() {
             : {},
         })
       } catch {
-        // Ignore errors - we still poll below
+        // Ignore - still poll below
       }
     }
 
-    // Poll until is_active = true (up to 15 seconds)
     let attempts = 0
     const interval = setInterval(async () => {
       const { data } = await supabase
@@ -53,6 +73,8 @@ export default function PaymentSuccess() {
     }, 2000)
   }
 
+  const isUrgency = type === 'urgency'
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
       <div className="card max-w-md w-full text-center py-10">
@@ -60,14 +82,18 @@ export default function PaymentSuccess() {
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4" />
             <h1 className="text-xl font-bold text-gray-900 mb-2">Verificando pago...</h1>
-            <p className="text-gray-500">Aguardá un momento mientras activamos tu cuenta.</p>
+            <p className="text-gray-500">Aguardá un momento mientras procesamos tu reserva.</p>
           </>
         )}
         {status === 'active' && (
           <>
             <p className="text-5xl mb-4">✅</p>
             <h1 className="text-xl font-bold text-gray-900 mb-2">¡Pago recibido!</h1>
-            <p className="text-gray-500">Tu cuenta está activa. Redirigiendo a tu agenda...</p>
+            <p className="text-gray-500">
+              {isUrgency
+                ? 'Tu turno urgente fue solicitado. Redirigiendo a tus turnos...'
+                : 'Tu cuenta está activa. Redirigiendo a tu agenda...'}
+            </p>
           </>
         )}
         {status === 'pending' && (
@@ -76,7 +102,6 @@ export default function PaymentSuccess() {
             <h1 className="text-xl font-bold text-gray-900 mb-2">Pago en proceso</h1>
             <p className="text-gray-500 mb-6">
               Tu pago fue recibido y está siendo procesado. Tu cuenta se activará en breve.
-              Podés acceder a tu agenda y esperar la confirmación.
             </p>
             <button onClick={() => navigate('/dashboard/medico')} className="btn-primary">
               Ir a mi agenda

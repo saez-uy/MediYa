@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { DAYS_OF_WEEK } from '../lib/constants'
+import { DAYS_OF_WEEK, URGENCY_FEE } from '../lib/constants'
 import type { DoctorWithDetails } from '../types'
 
 export default function DoctorPublicProfile() {
@@ -14,6 +14,7 @@ export default function DoctorPublicProfile() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
+  // Normal booking state
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [modality, setModality] = useState<'presencial' | 'videollamada'>('presencial')
@@ -23,7 +24,18 @@ export default function DoctorPublicProfile() {
   const [bookError, setBookError] = useState('')
   const [bookSuccess, setBookSuccess] = useState(false)
 
-  // día JS (0=dom) → día nuestro (0=lun)
+  // Urgency booking state
+  const [urgencyTime, setUrgencyTime] = useState('')
+  const [urgencyModality, setUrgencyModality] = useState<'presencial' | 'videollamada'>('presencial')
+  const [urgencyNotes, setUrgencyNotes] = useState('')
+  const [urgencyBooking, setUrgencyBooking] = useState(false)
+  const [urgencyError, setUrgencyError] = useState('')
+
+  const todayStr = new Date().toISOString().split('T')[0]
+  const tomorrowStr = (() => {
+    const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]
+  })()
+
   function jsToOurDay(jsDay: number) { return (jsDay + 6) % 7 }
 
   function getValidDates() {
@@ -31,7 +43,7 @@ export default function DoctorPublicProfile() {
     const availableDays = new Set(
       doctor.zones.flatMap((z) => z.schedules.map((s) => s.day_of_week))
     )
-    if (availableDays.size === 0) return [] // sin horarios configurados → libre
+    if (availableDays.size === 0) return []
     const dates: { value: string; label: string }[] = []
     const base = new Date()
     for (let i = 1; i <= 60; i++) {
@@ -89,9 +101,26 @@ export default function DoctorPublicProfile() {
     setModality(m === 'videollamada' ? 'videollamada' : 'presencial')
   }
 
+  // Returns time slots for today if doctor works today
+  function getTodaySlots() {
+    if (!doctor) return []
+    const availableDays = new Set(doctor.zones.flatMap((z) => z.schedules.map((s) => s.day_of_week)))
+    if (!availableDays.has(jsToOurDay(new Date().getDay()))) return []
+    return getTimeSlots(todayStr)
+  }
+
   useEffect(() => {
     if (id) fetchDoctor()
   }, [id])
+
+  useEffect(() => {
+    const slots = getTodaySlots()
+    if (slots.length > 0) {
+      setUrgencyTime(slots[0])
+      const m = getModalityForDate(todayStr)
+      setUrgencyModality(m === 'videollamada' ? 'videollamada' : 'presencial')
+    }
+  }, [doctor])
 
   async function fetchDoctor() {
     const { data, error } = await supabase
@@ -139,7 +168,30 @@ export default function DoctorPublicProfile() {
     }
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  async function handleUrgencyBook(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user) { navigate('/login'); return }
+    setUrgencyError('')
+    setUrgencyBooking(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('create-urgency-payment', {
+        body: {
+          doctor_id: id,
+          patient_id: user.id,
+          date: todayStr,
+          time: urgencyTime,
+          notes: urgencyNotes || null,
+          modality: urgencyModality,
+          payer_email: user.email,
+        },
+      })
+      if (error || data?.error) throw new Error(data?.error ?? 'Error al procesar el pago.')
+      window.location.href = data.checkout_url
+    } catch (err) {
+      setUrgencyError(err instanceof Error ? err.message : 'Error al procesar el pago.')
+      setUrgencyBooking(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -160,14 +212,11 @@ export default function DoctorPublicProfile() {
     )
   }
 
-  const initials = doctor.profile.full_name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-
+  const initials = doctor.profile.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
   const isOwnProfile = user?.id === id
+  const todaySlots = getTodaySlots()
+  const todayModality = getModalityForDate(todayStr)
+  const isPatient = profile?.role === 'patient' || !user
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
@@ -248,7 +297,7 @@ export default function DoctorPublicProfile() {
           )}
         </div>
 
-        {/* Right: booking form */}
+        {/* Right: booking forms */}
         <div className="space-y-4">
           {isOwnProfile ? (
             <div className="card text-center">
@@ -273,143 +322,237 @@ export default function DoctorPublicProfile() {
               </button>
             </div>
           ) : (
-            <div className="card">
-              <h2 className="font-semibold text-gray-800 mb-4">Solicitar turno</h2>
-              {!user && (
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                  <button onClick={() => navigate('/login')} className="font-medium hover:underline">
-                    Ingresá
-                  </button>{' '}
-                  o{' '}
-                  <button onClick={() => navigate('/registro')} className="font-medium hover:underline">
-                    registrate
-                  </button>{' '}
-                  para solicitar un turno.
-                </div>
-              )}
-              <form onSubmit={handleBook} className="space-y-4">
-                {(() => {
-                  const validDates = getValidDates()
-                  const timeSlots = getTimeSlots(date)
-                  const hasSchedule = validDates.length > 0
-                  return (
-                    <>
+            <>
+              {/* ⚡ Urgency: today's booking */}
+              {isPatient && todaySlots.length > 0 && (
+                <div className="card border-2 border-amber-300 bg-amber-50 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">⚡</span>
+                      <h2 className="font-semibold text-amber-900">Turno urgente para hoy</h2>
+                    </div>
+                    <p className="text-amber-700 text-xs">
+                      Requiere un pago adicional de <strong>$ {URGENCY_FEE} UYU</strong> para reservar el mismo día.
+                    </p>
+                  </div>
+
+                  {!user && (
+                    <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-sm text-yellow-800">
+                      <button onClick={() => navigate('/login')} className="font-medium hover:underline">Ingresá</button>{' '}
+                      o{' '}
+                      <button onClick={() => navigate('/registro')} className="font-medium hover:underline">registrate</button>{' '}
+                      para reservar.
+                    </div>
+                  )}
+
+                  <form onSubmit={handleUrgencyBook} className="space-y-3">
+                    <div>
+                      <label className="label">Hora</label>
+                      <select
+                        className="input"
+                        value={urgencyTime}
+                        onChange={(e) => setUrgencyTime(e.target.value)}
+                        required
+                        disabled={!user}
+                      >
+                        {todaySlots.map((t) => (
+                          <option key={t} value={t}>{t} hs</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {todayModality && (
                       <div>
-                        <label className="label">Fecha deseada</label>
-                        {hasSchedule ? (
-                          <select
-                            className="input"
-                            value={date}
-                            onChange={(e) => handleDateChange(e.target.value)}
-                            required
-                            disabled={!user}
-                          >
-                            <option value="">Seleccioná una fecha...</option>
-                            {validDates.map((d) => (
-                              <option key={d.value} value={d.value}>{d.label}</option>
+                        <label className="label">Tipo de consulta</label>
+                        {todayModality === 'ambas' ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            {(['presencial', 'videollamada'] as const).map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setUrgencyModality(m)}
+                                disabled={!user}
+                                className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                                  urgencyModality === m
+                                    ? 'border-amber-500 bg-amber-100 text-amber-800'
+                                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                }`}
+                              >
+                                {m === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
+                              </button>
                             ))}
-                          </select>
+                          </div>
                         ) : (
-                          <input
-                            type="date"
-                            className="input"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            min={today}
-                            required
-                            disabled={!user}
-                          />
+                          <div className="py-2 px-3 rounded-lg border text-sm font-medium border-amber-200 bg-amber-100 text-amber-800">
+                            {todayModality === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
+                          </div>
                         )}
                       </div>
-                      <div>
-                        <label className="label">Hora</label>
-                        {hasSchedule && date ? (
-                          timeSlots.length > 0 ? (
+                    )}
+
+                    <div>
+                      <label className="label">Motivo (opcional)</label>
+                      <textarea
+                        className="input resize-none"
+                        rows={2}
+                        placeholder="Describí brevemente el motivo..."
+                        value={urgencyNotes}
+                        onChange={(e) => setUrgencyNotes(e.target.value)}
+                        disabled={!user}
+                      />
+                    </div>
+
+                    {urgencyError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                        {urgencyError}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm transition-colors disabled:opacity-50"
+                      disabled={urgencyBooking || !user}
+                    >
+                      {urgencyBooking ? 'Procesando...' : `💳 Pagar $ ${URGENCY_FEE} y reservar`}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* Normal booking form */}
+              <div className="card">
+                <h2 className="font-semibold text-gray-800 mb-4">Solicitar turno</h2>
+                {!user && (
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                    <button onClick={() => navigate('/login')} className="font-medium hover:underline">Ingresá</button>{' '}
+                    o{' '}
+                    <button onClick={() => navigate('/registro')} className="font-medium hover:underline">registrate</button>{' '}
+                    para solicitar un turno.
+                  </div>
+                )}
+                <form onSubmit={handleBook} className="space-y-4">
+                  {(() => {
+                    const validDates = getValidDates()
+                    const timeSlots = getTimeSlots(date)
+                    const hasSchedule = validDates.length > 0
+                    return (
+                      <>
+                        <div>
+                          <label className="label">Fecha deseada</label>
+                          {hasSchedule ? (
                             <select
                               className="input"
-                              value={time}
-                              onChange={(e) => setTime(e.target.value)}
+                              value={date}
+                              onChange={(e) => handleDateChange(e.target.value)}
                               required
                               disabled={!user}
                             >
-                              {timeSlots.map((t) => (
-                                <option key={t} value={t}>{t} hs</option>
+                              <option value="">Seleccioná una fecha...</option>
+                              {validDates.map((d) => (
+                                <option key={d.value} value={d.value}>{d.label}</option>
                               ))}
                             </select>
                           ) : (
-                            <p className="text-sm text-gray-400 py-2">Sin horarios para ese día.</p>
-                          )
-                        ) : (
-                          <input
-                            type="time"
-                            className="input"
-                            value={time}
-                            onChange={(e) => setTime(e.target.value)}
-                            required={!hasSchedule}
-                            disabled={!user || (hasSchedule && !date)}
-                          />
-                        )}
-                      </div>
-                    </>
-                  )
-                })()}
+                            <input
+                              type="date"
+                              className="input"
+                              value={date}
+                              onChange={(e) => setDate(e.target.value)}
+                              min={tomorrowStr}
+                              required
+                              disabled={!user}
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <label className="label">Hora</label>
+                          {hasSchedule && date ? (
+                            timeSlots.length > 0 ? (
+                              <select
+                                className="input"
+                                value={time}
+                                onChange={(e) => setTime(e.target.value)}
+                                required
+                                disabled={!user}
+                              >
+                                {timeSlots.map((t) => (
+                                  <option key={t} value={t}>{t} hs</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <p className="text-sm text-gray-400 py-2">Sin horarios para ese día.</p>
+                            )
+                          ) : (
+                            <input
+                              type="time"
+                              className="input"
+                              value={time}
+                              onChange={(e) => setTime(e.target.value)}
+                              required={!hasSchedule}
+                              disabled={!user || (hasSchedule && !date)}
+                            />
+                          )}
+                        </div>
+                      </>
+                    )
+                  })()}
 
-                {/* Modalidad */}
-                {availableModality && (
+                  {availableModality && (
+                    <div>
+                      <label className="label">Tipo de consulta</label>
+                      {availableModality === 'ambas' ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['presencial', 'videollamada'] as const).map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setModality(m)}
+                              className={`py-2.5 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                                modality === m
+                                  ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                              }`}
+                            >
+                              {m === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-2.5 px-3 rounded-lg border text-sm font-medium border-primary-200 bg-primary-50 text-primary-700">
+                          {availableModality === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div>
-                    <label className="label">Tipo de consulta</label>
-                    {availableModality === 'ambas' ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        {(['presencial', 'videollamada'] as const).map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => setModality(m)}
-                            className={`py-2.5 px-3 rounded-lg border text-sm font-medium transition-colors ${
-                              modality === m
-                                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                            }`}
-                          >
-                            {m === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className={`py-2.5 px-3 rounded-lg border text-sm font-medium border-primary-200 bg-primary-50 text-primary-700`}>
-                        {availableModality === 'presencial' ? '🏥 Presencial' : '💻 Videollamada'}
-                      </div>
-                    )}
+                    <label className="label">Motivo de consulta (opcional)</label>
+                    <textarea
+                      className="input resize-none"
+                      rows={3}
+                      placeholder="Describí brevemente el motivo..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      disabled={!user}
+                    />
                   </div>
-                )}
 
-                <div>
-                  <label className="label">Motivo de consulta (opcional)</label>
-                  <textarea
-                    className="input resize-none"
-                    rows={3}
-                    placeholder="Describí brevemente el motivo..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    disabled={!user}
-                  />
-                </div>
+                  {bookError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                      {bookError}
+                    </div>
+                  )}
 
-                {bookError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
-                    {bookError}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="btn-primary w-full"
-                  disabled={booking || !user}
-                >
-                  {booking ? 'Enviando...' : 'Solicitar turno'}
-                </button>
-              </form>
-            </div>
+                  <button
+                    type="submit"
+                    className="btn-primary w-full"
+                    disabled={booking || !user}
+                  >
+                    {booking ? 'Enviando...' : 'Solicitar turno'}
+                  </button>
+                </form>
+              </div>
+            </>
           )}
         </div>
       </div>

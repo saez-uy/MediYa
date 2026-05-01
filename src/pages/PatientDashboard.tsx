@@ -108,6 +108,7 @@ export default function PatientDashboard() {
     setCancellingId(null)
   }
 
+  const pendingPayment = appointments.filter((a) => a.status === 'pending_payment')
   const pending = appointments.filter((a) => a.status === 'pending')
   const accepted = appointments.filter((a) => a.status === 'accepted')
   const past = appointments.filter((a) => a.status === 'rejected' || a.status === 'cancelled')
@@ -139,6 +140,15 @@ export default function PatientDashboard() {
         </div>
       ) : (
         <div className="space-y-8">
+          {pendingPayment.length > 0 && (
+            <Section
+              title="Pago pendiente"
+              appointments={pendingPayment}
+              navigate={navigate}
+              onCancel={handleCancel}
+              cancellingId={cancellingId}
+            />
+          )}
           {pending.length > 0 && (
             <Section
               title="Pendientes de confirmación"
@@ -219,6 +229,7 @@ function PatientAppointmentCard({
   const timeStr = appointment.requested_time.slice(0, 5)
 
   const isActive = appointment.status === 'pending' || appointment.status === 'accepted'
+  const isPendingPayment = appointment.status === 'pending_payment'
   const showCancel = isActive && canCancelAppointment(appointment.requested_date, appointment.requested_time)
 
   const statusClass =
@@ -267,7 +278,12 @@ function PatientAppointmentCard({
               <span className="font-medium">Motivo:</span> {appointment.patient_notes}
             </p>
           )}
-          {showCancel && (
+          {isPendingPayment && (
+            <p className="mt-3 text-xs text-amber-600 font-medium">
+              ⏳ Esperando confirmación del pago.
+            </p>
+          )}
+          {!isPendingPayment && showCancel && (
             <button
               onClick={() => onCancel(appointment)}
               disabled={cancelling}
@@ -276,7 +292,7 @@ function PatientAppointmentCard({
               {cancelling ? 'Cancelando...' : 'Cancelar turno'}
             </button>
           )}
-          {isActive && !showCancel && (
+          {!isPendingPayment && isActive && !showCancel && (
             <p className="mt-3 text-xs text-gray-400">
               No se puede cancelar con menos de 24 hs de anticipación.
             </p>

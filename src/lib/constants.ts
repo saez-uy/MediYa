@@ -127,4 +127,7 @@ export const STATUS_LABELS: Record<string, string> = {
   accepted: 'Confirmada',
   rejected: 'Rechazada',
   cancelled: 'Cancelada',
+  pending_payment: 'Pago pendiente',
 }
+
+export const URGENCY_FEE = 300
