@@ -167,6 +167,7 @@ export default function DoctorPublicProfile() {
         consultation_fee,
         is_active,
         accepts_same_day,
+        slot_duration_minutes,
         profile:profiles!inner(id, full_name, phone, role, created_at),
         specialties:doctor_specialties(specialty),
         zones:doctor_zones(id, department, zone, schedules:doctor_zone_schedules(*))
