@@ -178,6 +178,7 @@ function PatientAppointmentCard({ appointment, navigate, onCancel, cancelling, e
   const isActive = appointment.status === 'pending' || appointment.status === 'accepted'
   const isPendingPayment = appointment.status === 'pending_payment'
   const showCancel = isActive && canCancelAppointment(appointment.requested_date, appointment.requested_time)
+  const appointmentPassed = new Date(`${appointment.requested_date}T${appointment.requested_time}`) < new Date()
 
   const statusClass =
     appointment.status === 'pending' ? 'badge-pending'
@@ -241,8 +242,8 @@ function PatientAppointmentCard({ appointment, navigate, onCancel, cancelling, e
             </p>
           )}
 
-          {/* Review section — only for accepted appointments */}
-          {appointment.status === 'accepted' && (
+          {/* Review section — only for accepted appointments that already happened */}
+          {appointment.status === 'accepted' && appointmentPassed && (
             <div className="mt-3">
               {existingReview ? (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg space-y-1">
