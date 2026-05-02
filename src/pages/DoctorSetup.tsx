@@ -42,6 +42,7 @@ export default function DoctorSetup() {
   const [documento, setDocumento] = useState('')
   const [documentoLocked, setDocumentoLocked] = useState(false)
   const [acceptsSameDay, setAcceptsSameDay] = useState(false)
+  const [slotDuration, setSlotDuration] = useState(30)
   const [selectedZones, setSelectedZones] = useState<SelectedZone[]>([])
   const [zoneSchedules, setZoneSchedules] = useState<Record<string, ScheduleRow[]>>({})
   const [openDept, setOpenDept] = useState<string | null>('Montevideo')
@@ -75,6 +76,7 @@ export default function DoctorSetup() {
       setPhone2(dp.phone2 || '')
       setIsActive(dp.is_active ?? false)
       setAcceptsSameDay(dp.accepts_same_day ?? false)
+      setSlotDuration(dp.slot_duration_minutes ?? 30)
       if (dp.is_active === false) setNeedsPayment(true)
       if (dp.caja_profesional) {
         setCajaProfesional(dp.caja_profesional)
@@ -189,6 +191,7 @@ export default function DoctorSetup() {
         is_active: isActive,
         phone2: phone2.trim() || null,
         accepts_same_day: acceptsSameDay,
+        slot_duration_minutes: slotDuration,
       }
       if (!cajaProfesionalLocked) {
         dpPayload.caja_profesional = cajaProfesional.trim() || null
@@ -447,6 +450,20 @@ export default function DoctorSetup() {
                 Los pacientes podrán reservar un turno urgente para hoy abonando un cargo adicional de $ {URGENCY_FEE} UYU.
               </p>
             </label>
+          </div>
+
+          <div>
+            <label className="label">Duración de cada turno</label>
+            <select
+              className="input"
+              value={slotDuration}
+              onChange={(e) => setSlotDuration(parseInt(e.target.value))}
+            >
+              {[15, 20, 30, 45, 60].map((mins) => (
+                <option key={mins} value={mins}>{mins} minutos</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Define cada cuántos minutos se generan los horarios disponibles.</p>
           </div>
 
           <div>

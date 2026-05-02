@@ -57,6 +57,7 @@ export interface DoctorWithDetails {
   consultation_fee: number | null
   is_active: boolean
   accepts_same_day: boolean
+  slot_duration_minutes: number
   profile: Profile
   specialties: { specialty: string }[]
   zones: DoctorZoneWithSchedules[]

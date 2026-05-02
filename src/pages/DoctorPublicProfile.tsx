@@ -78,6 +78,7 @@ export default function DoctorPublicProfile() {
     const daySchedules = doctor.zones.flatMap((z) =>
       z.schedules.filter((s) => s.day_of_week === ourDay)
     )
+    const slotMins = doctor.slot_duration_minutes ?? 30
     const slots: string[] = []
     for (const sched of daySchedules) {
       const [sh, sm] = sched.start_time.slice(0, 5).split(':').map(Number)
@@ -87,7 +88,7 @@ export default function DoctorPublicProfile() {
       while (cur < end) {
         const slot = `${String(Math.floor(cur / 60)).padStart(2, '0')}:${String(cur % 60).padStart(2, '0')}`
         if (!slots.includes(slot)) slots.push(slot)
-        cur += 30
+        cur += slotMins
       }
     }
     return slots.sort()
@@ -311,11 +312,12 @@ export default function DoctorPublicProfile() {
                   ))}
                 </div>
               )}
-              {doctor.consultation_fee && (
-                <p className="text-gray-500 text-sm mt-1">
-                  💰 $ {doctor.consultation_fee.toLocaleString('es-UY')} la consulta
-                </p>
-              )}
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                {doctor.consultation_fee && (
+                  <p className="text-gray-500 text-sm">💰 $ {doctor.consultation_fee.toLocaleString('es-UY')} la consulta</p>
+                )}
+                <p className="text-gray-500 text-sm">🕐 {doctor.slot_duration_minutes ?? 30} min por turno</p>
+              </div>
             </div>
           </div>
 
