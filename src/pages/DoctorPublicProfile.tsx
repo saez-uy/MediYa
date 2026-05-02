@@ -22,6 +22,7 @@ export default function DoctorPublicProfile() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [reviews, setReviews] = useState<DoctorReview[]>([])
+  const [slotDuration, setSlotDuration] = useState(30)
 
   // Normal booking state
   const [date, setDate] = useState('')
@@ -78,7 +79,7 @@ export default function DoctorPublicProfile() {
     const daySchedules = doctor.zones.flatMap((z) =>
       z.schedules.filter((s) => s.day_of_week === ourDay)
     )
-    const slotMins = doctor.slot_duration_minutes ?? 30
+    const slotMins = slotDuration
     const slots: string[] = []
     for (const sched of daySchedules) {
       const [sh, sm] = sched.start_time.slice(0, 5).split(':').map(Number)
@@ -167,7 +168,6 @@ export default function DoctorPublicProfile() {
         consultation_fee,
         is_active,
         accepts_same_day,
-        slot_duration_minutes,
         profile:profiles!inner(id, full_name, phone, role, created_at),
         specialties:doctor_specialties(specialty),
         zones:doctor_zones(id, department, zone, schedules:doctor_zone_schedules(*))
@@ -181,6 +181,14 @@ export default function DoctorPublicProfile() {
       return
     }
     setDoctor(data as unknown as DoctorWithDetails)
+
+    // Load slot duration separately so a missing column never breaks the main fetch
+    const { data: dpExtra } = await supabase
+      .from('doctor_profiles')
+      .select('slot_duration_minutes')
+      .eq('id', id)
+      .single()
+    if (dpExtra?.slot_duration_minutes) setSlotDuration(dpExtra.slot_duration_minutes)
 
     const { data: reviewData } = await supabase
       .from('doctor_reviews')
@@ -317,7 +325,7 @@ export default function DoctorPublicProfile() {
                 {doctor.consultation_fee && (
                   <p className="text-gray-500 text-sm">💰 $ {doctor.consultation_fee.toLocaleString('es-UY')} la consulta</p>
                 )}
-                <p className="text-gray-500 text-sm">🕐 {doctor.slot_duration_minutes ?? 30} min por turno</p>
+                <p className="text-gray-500 text-sm">🕐 {slotDuration} min por turno</p>
               </div>
             </div>
           </div>
