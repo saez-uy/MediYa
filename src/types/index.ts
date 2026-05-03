@@ -55,6 +55,8 @@ export interface DoctorWithDetails {
   id: string
   bio: string | null
   consultation_fee: number | null
+  service_fees: string | null
+  documento_url: string | null
   is_active: boolean
   accepts_same_day: boolean
   slot_duration_minutes?: number

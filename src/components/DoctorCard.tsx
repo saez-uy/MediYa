@@ -44,8 +44,8 @@ export default function DoctorCard({ doctor, rating }: Props) {
               : <span className="text-xs text-gray-400">Sin calificaciones</span>
             }
           </div>
-          {doctor.consultation_fee && (
-            <p className="text-gray-500 text-sm mt-0.5">$ {doctor.consultation_fee.toLocaleString('es-UY')} la consulta</p>
+          {doctor.service_fees && (
+            <p className="text-gray-500 text-sm mt-0.5 line-clamp-1">💰 {doctor.service_fees.split('\n')[0]}</p>
           )}
         </div>
       </div>

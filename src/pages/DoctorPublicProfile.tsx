@@ -165,7 +165,7 @@ export default function DoctorPublicProfile() {
       .select(`
         id,
         bio,
-        consultation_fee,
+        service_fees,
         is_active,
         accepts_same_day,
         profile:profiles!inner(id, full_name, phone, role, created_at),
@@ -322,11 +322,14 @@ export default function DoctorPublicProfile() {
                 </div>
               )}
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
-                {doctor.consultation_fee && (
-                  <p className="text-gray-500 text-sm">💰 $ {doctor.consultation_fee.toLocaleString('es-UY')} la consulta</p>
-                )}
                 <p className="text-gray-500 text-sm">🕐 {slotDuration} min por turno</p>
               </div>
+              {doctor.service_fees && (
+                <div className="mt-2 p-2.5 bg-gray-50 border border-gray-100 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">💰 Costos</p>
+                  <p className="text-gray-700 text-sm whitespace-pre-line">{doctor.service_fees}</p>
+                </div>
+              )}
             </div>
           </div>
 

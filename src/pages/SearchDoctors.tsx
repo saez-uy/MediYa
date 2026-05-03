@@ -38,7 +38,7 @@ export default function SearchDoctors() {
       .select(`
         id,
         bio,
-        consultation_fee,
+        service_fees,
         is_active,
         accepts_same_day,
         profile:profiles!inner(id, full_name, phone, role, created_at),

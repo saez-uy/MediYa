@@ -34,7 +34,9 @@ export default function DoctorSetup() {
 
   const [specialties, setSpecialties] = useState<string[]>([])
   const [bio, setBio] = useState('')
-  const [fee, setFee] = useState('')
+  const [serviceFees, setServiceFees] = useState('')
+  const [documentoFile, setDocumentoFile] = useState<File | null>(null)
+  const [documentoPhotoUrl, setDocumentoPhotoUrl] = useState<string | null>(null)
   const [phone1, setPhone1] = useState('')
   const [phone2, setPhone2] = useState('')
   const [cajaProfesional, setCajaProfesional] = useState('')
@@ -72,7 +74,8 @@ export default function DoctorSetup() {
     const { data: dp } = await supabase.from('doctor_profiles').select('*').eq('id', user!.id).single()
     if (dp) {
       setBio(dp.bio || '')
-      setFee(dp.consultation_fee ? String(dp.consultation_fee) : '')
+      setServiceFees(dp.service_fees || (dp.consultation_fee ? String(dp.consultation_fee) : ''))
+      setDocumentoPhotoUrl(dp.documento_url || null)
       setPhone2(dp.phone2 || '')
       setIsActive(dp.is_active ?? false)
       setAcceptsSameDay(dp.accepts_same_day ?? false)
@@ -184,10 +187,22 @@ export default function DoctorSetup() {
     try {
       await supabase.from('profiles').update({ phone: phone1.trim() }).eq('id', user!.id)
 
+      let uploadedDocUrl = documentoPhotoUrl
+      if (documentoFile) {
+        const ext = documentoFile.name.split('.').pop() ?? 'jpg'
+        const path = `${user!.id}/documento.${ext}`
+        const { error: upErr } = await supabase.storage.from('doctor-docs').upload(path, documentoFile, { upsert: true })
+        if (upErr) throw new Error('Error al subir la foto del documento: ' + upErr.message)
+        const { data: { publicUrl } } = supabase.storage.from('doctor-docs').getPublicUrl(path)
+        uploadedDocUrl = publicUrl
+        setDocumentoPhotoUrl(publicUrl)
+      }
+
       const dpPayload: Record<string, unknown> = {
         id: user!.id,
         bio: bio || null,
-        consultation_fee: fee ? parseInt(fee) : null,
+        service_fees: serviceFees.trim() || null,
+        documento_url: uploadedDocUrl,
         is_active: isActive,
         phone2: phone2.trim() || null,
         accepts_same_day: acceptsSameDay,
@@ -404,6 +419,28 @@ export default function DoctorSetup() {
           </div>
 
           <div>
+            <label className="label">Foto del documento (CI)</label>
+            {documentoPhotoUrl && !documentoFile && (
+              <div className="mb-2">
+                <a href={documentoPhotoUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-primary-600 text-sm hover:underline">
+                  📎 Ver foto cargada
+                </a>
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer"
+              onChange={(e) => setDocumentoFile(e.target.files?.[0] ?? null)}
+            />
+            {documentoFile && (
+              <p className="text-xs text-green-600 mt-1">📷 {documentoFile.name} seleccionado</p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">Opcional pero recomendado para agilizar la verificación.</p>
+          </div>
+
+          <div>
             <label className="label">
               Número de Caja Profesional {!cajaProfesionalLocked && <span className="text-red-500">*</span>}
               {cajaProfesionalLocked && (
@@ -467,15 +504,15 @@ export default function DoctorSetup() {
           </div>
 
           <div>
-            <label className="label">Costo de consulta ($ uruguayos)</label>
-            <input
-              type="number"
-              className="input"
-              placeholder="Ej: 1500"
-              value={fee}
-              onChange={(e) => setFee(e.target.value)}
-              min={0}
+            <label className="label">Costo de servicios</label>
+            <textarea
+              className="input resize-none"
+              rows={3}
+              placeholder={"Ej:\nConsulta general: $1.500\nControl: $1.000\nVideollamada: $1.200"}
+              value={serviceFees}
+              onChange={(e) => setServiceFees(e.target.value)}
             />
+            <p className="text-xs text-gray-400 mt-1">Texto libre: podés listar los precios de cada servicio.</p>
           </div>
         </div>
 
