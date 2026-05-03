@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 import { STATUS_LABELS } from '../lib/constants'
 import type { AppointmentStatus } from '../types'
 
@@ -48,6 +49,7 @@ const MONTH_NAMES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'se
 export default function DoctorDashboard() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
+  usePushNotifications()
   const [appointments, setAppointments] = useState<AppointmentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<FilterTab>('all')
