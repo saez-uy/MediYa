@@ -261,6 +261,16 @@ export default function DoctorDashboard() {
           <p className="text-gray-500 mt-1">Hola, {profile?.full_name}</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Refresh */}
+          <button
+            onClick={() => fetchAppointments()}
+            disabled={loading}
+            className="btn-ghost text-sm flex items-center gap-1.5 disabled:opacity-50"
+            title="Actualizar"
+          >
+            <span className={loading ? 'animate-spin inline-block' : ''}>↻</span>
+            Actualizar
+          </button>
           {/* View toggle */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
