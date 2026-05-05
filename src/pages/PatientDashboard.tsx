@@ -237,10 +237,13 @@ function PatientAppointmentCard({ appointment, navigate, onCancel, cancelling, e
   const showCancel = isActive && canCancelAppointment(appointment.requested_date, appointment.requested_time)
   const appointmentPassed = new Date(`${appointment.requested_date}T${appointment.requested_time}`) < new Date()
 
-  const statusClass =
-    appointment.status === 'pending' ? 'badge-pending'
+  const isClosed = appointment.status === 'rejected' || appointment.status === 'cancelled'
+  const isFinished = appointmentPassed && !isClosed
+  const statusClass = isFinished ? 'badge-done'
+    : appointment.status === 'pending' ? 'badge-pending'
     : appointment.status === 'accepted' ? 'badge-accepted'
     : 'badge-rejected'
+  const statusLabel = isFinished ? 'Finalizada' : STATUS_LABELS[appointment.status]
 
   async function handleSubmitReview() {
     if (reviewRating === 0) { setReviewError('Seleccioná una calificación.'); return }
@@ -267,7 +270,7 @@ function PatientAppointmentCard({ appointment, navigate, onCancel, cancelling, e
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <span className={statusClass}>{STATUS_LABELS[appointment.status]}</span>
+            <span className={statusClass}>{statusLabel}</span>
           </div>
           <h3 className="font-semibold text-gray-900">{appointment.doctor?.full_name ?? 'Médico'}</h3>
           {appointment.specialty && <p className="text-primary-600 text-sm">{appointment.specialty}</p>}
