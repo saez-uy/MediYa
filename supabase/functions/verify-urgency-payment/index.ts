@@ -24,16 +24,15 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Test mode: create-urgency-payment already set status to pending
+    // Test mode: mark as paid and confirm
     if (payment_id === 'test' || !payment_id) {
-      const { data: appt } = await supabase
+      const { error } = await supabase
         .from('appointments')
-        .select('status')
+        .update({ status: 'pending', has_payment: true })
         .eq('id', appointment_id)
-        .single()
-
-      if (appt?.status === 'pending') return json({ verified: true })
-      return json({ verified: false, reason: 'Pago no confirmado.' })
+        .eq('status', 'pending_payment')
+      if (error) console.warn('Test mode update error:', error)
+      return json({ verified: true })
     }
 
     // Production: verify payment status with MercadoPago

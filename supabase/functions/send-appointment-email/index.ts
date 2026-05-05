@@ -238,6 +238,15 @@ serve(async (req) => {
           `Turno cancelado — ${patientName}`,
           emailAppointmentCancelled({ patientName, when, appUrl }),
         )
+        // Si tenía pago confirmado → alertar al admin para reembolso manual
+        if (record.has_payment && adminEmail && patientEmail) await send(
+          adminEmail,
+          `⚠️ Reembolso pendiente — ${patientName} (canceló el paciente)`,
+          emailRefundAlert({
+            patientName, patientEmail, doctorName, when,
+            reason: 'El paciente canceló el turno.', appUrl,
+          }),
+        )
       }
     }
 
