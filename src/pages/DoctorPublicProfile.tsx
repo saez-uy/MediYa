@@ -46,9 +46,13 @@ export default function DoctorPublicProfile() {
   const [urgencyBooking, setUrgencyBooking] = useState(false)
   const [urgencyError, setUrgencyError] = useState('')
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  function localDateStr(d: Date) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const todayStr = localDateStr(new Date())
   const tomorrowStr = (() => {
-    const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]
+    const d = new Date(); d.setDate(d.getDate() + 1); return localDateStr(d)
   })()
 
   function jsToOurDay(jsDay: number) { return (jsDay + 6) % 7 }
@@ -64,7 +68,7 @@ export default function DoctorPublicProfile() {
     for (let i = 1; i <= 60; i++) {
       const d = new Date(base)
       d.setDate(base.getDate() + i)
-      const dateStr = d.toISOString().split('T')[0]
+      const dateStr = localDateStr(d)
       if (availableDays.has(jsToOurDay(d.getDay())) && !blockedDates.has(dateStr)) {
         dates.push({
           value: dateStr,
@@ -216,6 +220,12 @@ export default function DoctorPublicProfile() {
     setBookError('')
     setBooking(true)
     try {
+      if (blockedDates.has(date)) {
+        setBookError('El médico no atiende ese día. Por favor elegí otra fecha.')
+        setBooking(false)
+        return
+      }
+
       // Pre-check: verify slot is still free (handles race conditions)
       const freshBooked = await loadBookedSlotsForDate(date)
       if (freshBooked.has(time)) {
