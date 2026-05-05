@@ -104,10 +104,28 @@ export default function PatientDashboard() {
     setReviewMap((prev) => ({ ...prev, [appointmentId]: entry }))
   }
 
-  const pendingPayment = appointments.filter((a) => a.status === 'pending_payment')
-  const pending = appointments.filter((a) => a.status === 'pending')
-  const accepted = appointments.filter((a) => a.status === 'accepted')
+  const now = new Date()
+
+  const activeAppointments = appointments.filter(
+    (a) => a.status === 'pending' || a.status === 'accepted' || a.status === 'pending_payment'
+  )
+
+  // Next upcoming = earliest future active appointment
+  const nextConsulta = activeAppointments
+    .filter((a) => new Date(`${a.requested_date}T${a.requested_time}`) > now)
+    .sort((a, b) =>
+      new Date(`${a.requested_date}T${a.requested_time}`).getTime() -
+      new Date(`${b.requested_date}T${b.requested_time}`).getTime()
+    )[0] ?? null
+
+  const otherActive = activeAppointments.filter((a) => a.id !== nextConsulta?.id)
+  const pendingPayment = otherActive.filter((a) => a.status === 'pending_payment')
+  const pending = otherActive.filter((a) => a.status === 'pending')
+  const accepted = otherActive.filter((a) => a.status === 'accepted')
   const past = appointments.filter((a) => a.status === 'rejected' || a.status === 'cancelled')
+  const pastAccepted = appointments.filter(
+    (a) => a.status === 'accepted' && new Date(`${a.requested_date}T${a.requested_time}`) <= now && a.id !== nextConsulta?.id
+  )
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
@@ -132,10 +150,49 @@ export default function PatientDashboard() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* Próxima consulta */}
+          {nextConsulta ? (
+            <div>
+              <h2 className="text-lg font-semibold text-gray-700 mb-4">Próxima consulta</h2>
+              <div className="rounded-2xl border-2 border-primary-200 bg-primary-50 p-1">
+                <PatientAppointmentCard
+                  appointment={nextConsulta}
+                  navigate={navigate}
+                  onCancel={handleCancel}
+                  cancelling={cancellingId === nextConsulta.id}
+                  existingReview={reviewMap[nextConsulta.id]}
+                  onReviewSaved={handleReviewSaved}
+                  patientId={user!.id}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border-2 border-dashed border-gray-200 p-6 text-center">
+              <p className="text-gray-400 text-sm">No tenés consultas próximas agendadas.</p>
+              <Link to="/buscar" className="btn-primary text-sm mt-3 inline-block">Buscar médico</Link>
+            </div>
+          )}
+
+          {/* Otros turnos activos */}
           {pendingPayment.length > 0 && <Section title="Pago pendiente" appointments={pendingPayment} navigate={navigate} onCancel={handleCancel} cancellingId={cancellingId} reviewMap={reviewMap} onReviewSaved={handleReviewSaved} patientId={user!.id} />}
           {pending.length > 0 && <Section title="Pendientes de confirmación" appointments={pending} navigate={navigate} onCancel={handleCancel} cancellingId={cancellingId} reviewMap={reviewMap} onReviewSaved={handleReviewSaved} patientId={user!.id} />}
           {accepted.length > 0 && <Section title="Confirmadas" appointments={accepted} navigate={navigate} onCancel={handleCancel} cancellingId={cancellingId} reviewMap={reviewMap} onReviewSaved={handleReviewSaved} patientId={user!.id} />}
-          {past.length > 0 && <Section title="Historial" appointments={past} navigate={navigate} onCancel={handleCancel} cancellingId={cancellingId} reviewMap={reviewMap} onReviewSaved={handleReviewSaved} patientId={user!.id} />}
+
+          {/* Historial */}
+          {(past.length > 0 || pastAccepted.length > 0) && (
+            <Section
+              title="Historial"
+              appointments={[...pastAccepted, ...past].sort(
+                (a, b) => new Date(`${b.requested_date}T${b.requested_time}`).getTime() - new Date(`${a.requested_date}T${a.requested_time}`).getTime()
+              )}
+              navigate={navigate}
+              onCancel={handleCancel}
+              cancellingId={cancellingId}
+              reviewMap={reviewMap}
+              onReviewSaved={handleReviewSaved}
+              patientId={user!.id}
+            />
+          )}
         </div>
       )}
     </div>
