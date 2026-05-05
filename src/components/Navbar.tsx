@@ -22,7 +22,7 @@ export default function Navbar() {
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">M</span>
           </div>
-          <span className="text-xl font-bold text-primary-700">MediYa <span className="text-xs font-normal text-gray-400">v3.0</span></span>
+          <span className="text-xl font-bold text-primary-700">MediYa <span className="text-xs font-normal text-gray-400">v3.1</span></span>
         </Link>
 
         {/* Desktop nav */}
