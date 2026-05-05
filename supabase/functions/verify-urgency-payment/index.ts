@@ -51,10 +51,10 @@ serve(async (req) => {
       return json({ verified: false, reason: 'Referencia de pago inválida.' })
     }
 
-    // All good — activate the appointment
+    // All good — activate the appointment and mark as paid
     const { error } = await supabase
       .from('appointments')
-      .update({ status: 'pending' })
+      .update({ status: 'pending', has_payment: true })
       .eq('id', appointment_id)
       .eq('status', 'pending_payment')
 

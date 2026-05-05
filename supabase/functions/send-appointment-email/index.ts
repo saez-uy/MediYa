@@ -106,6 +106,25 @@ function emailAppointmentCancelled(opts: {
   `, opts.appUrl)
 }
 
+function emailRefundAlert(opts: {
+  patientName: string; patientEmail: string; doctorName: string
+  when: string; reason: string | null; appUrl: string
+}) {
+  return wrap(`
+    <p style="margin:0 0 8px;font-size:20px;font-weight:700;color:#b91c1c;">⚠️ Reembolso pendiente</p>
+    <p style="margin:0 0 24px;color:#6b7280;font-size:14px;">Un médico rechazó un turno que ya tenía pago confirmado. Se requiere reembolso manual.</p>
+    <table cellpadding="0" cellspacing="0" style="width:100%;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
+      ${tRow('Paciente', opts.patientName)}
+      ${tRow('Email paciente', opts.patientEmail)}
+      ${tRow('Médico', opts.doctorName)}
+      ${tRow('Fecha y hora', opts.when)}
+      ${opts.reason ? tRow('Motivo de rechazo', opts.reason) : ''}
+    </table>
+    <p style="margin:0 0 24px;color:#374151;font-size:14px;font-weight:500;">Acción requerida: contactar al paciente y procesar el reembolso desde MercadoPago.</p>
+    <a href="${opts.appUrl}/admin" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;">Ir al panel de admin</a>
+  `, opts.appUrl)
+}
+
 // ── Main handler ───────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -129,8 +148,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    const fromEmail = Deno.env.get('FROM_EMAIL') ?? 'MediYa <onboarding@resend.dev>'
-    const appUrl    = (Deno.env.get('APP_URL') ?? 'https://mediya.uy').replace(/\/$/, '')
+    const fromEmail  = Deno.env.get('FROM_EMAIL') ?? 'MediYa <onboarding@resend.dev>'
+    const appUrl     = (Deno.env.get('APP_URL') ?? 'https://mediya.uy').replace(/\/$/, '')
+    const adminEmail = Deno.env.get('ADMIN_EMAIL') ?? null
 
     // Fetch doctor and patient emails via auth.admin (email lives in auth.users)
     const [{ data: { user: doctorUser } }, { data: { user: patientUser } }] = await Promise.all([
@@ -199,6 +219,15 @@ serve(async (req) => {
           patientEmail,
           'Tu turno no pudo confirmarse — MediYa',
           emailAppointmentRejected({ doctorName, when, reason: record.doctor_notes ?? null, appUrl }),
+        )
+        // Si tenía pago confirmado → alertar al admin para reembolso manual
+        if (record.has_payment && adminEmail && patientEmail) await send(
+          adminEmail,
+          `⚠️ Reembolso pendiente — ${patientName}`,
+          emailRefundAlert({
+            patientName, patientEmail, doctorName, when,
+            reason: record.doctor_notes ?? null, appUrl,
+          }),
         )
       }
 
