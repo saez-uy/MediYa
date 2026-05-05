@@ -22,6 +22,7 @@ export default function SearchDoctors() {
   const [modality, setModality] = useState('')
   const [dayOfWeek, setDayOfWeek] = useState('')
   const [urgencyOnly, setUrgencyOnly] = useState(false)
+  const [searchName, setSearchName] = useState('')
 
   useEffect(() => {
     fetchDoctors()
@@ -29,7 +30,7 @@ export default function SearchDoctors() {
 
   useEffect(() => {
     applyFilters()
-  }, [doctors, specialty, department, zone, modality, dayOfWeek, urgencyOnly])
+  }, [doctors, specialty, department, zone, modality, dayOfWeek, urgencyOnly, searchName])
 
   async function fetchDoctors() {
     setLoading(true)
@@ -116,6 +117,11 @@ export default function SearchDoctors() {
       result = result.filter((d) => d.accepts_same_day)
     }
 
+    if (searchName.trim()) {
+      const q = searchName.trim().toLowerCase()
+      result = result.filter((d) => d.profile.full_name.toLowerCase().includes(q))
+    }
+
     setFiltered(result)
   }
 
@@ -131,9 +137,10 @@ export default function SearchDoctors() {
     setModality('')
     setDayOfWeek('')
     setUrgencyOnly(false)
+    setSearchName('')
   }
 
-  const hasFilters = specialty || department || zone || modality || dayOfWeek !== '' || urgencyOnly
+  const hasFilters = specialty || department || zone || modality || dayOfWeek !== '' || urgencyOnly || searchName.trim()
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -144,6 +151,16 @@ export default function SearchDoctors() {
 
       {/* Filters */}
       <div className="card mb-8">
+        <div className="mb-4">
+          <label className="label">Buscar por nombre</label>
+          <input
+            type="text"
+            className="input"
+            placeholder="Ej: García, Juan..."
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+          />
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="label">Especialidad</label>

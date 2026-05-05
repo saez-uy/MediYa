@@ -23,6 +23,7 @@ export default function DoctorPublicProfile() {
   const [notFound, setNotFound] = useState(false)
   const [reviews, setReviews] = useState<DoctorReview[]>([])
   const [slotDuration, setSlotDuration] = useState(30)
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set())
 
   // Normal booking state
   const [date, setDate] = useState('')
@@ -63,9 +64,10 @@ export default function DoctorPublicProfile() {
     for (let i = 1; i <= 60; i++) {
       const d = new Date(base)
       d.setDate(base.getDate() + i)
-      if (availableDays.has(jsToOurDay(d.getDay()))) {
+      const dateStr = d.toISOString().split('T')[0]
+      if (availableDays.has(jsToOurDay(d.getDay())) && !blockedDates.has(dateStr)) {
         dates.push({
-          value: d.toISOString().split('T')[0],
+          value: dateStr,
           label: d.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' }),
         })
       }
@@ -109,6 +111,7 @@ export default function DoctorPublicProfile() {
 
   function getTodayAllSlots() {
     if (!doctor) return []
+    if (blockedDates.has(todayStr)) return []
     const availableDays = new Set(doctor.zones.flatMap((z) => z.schedules.map((s) => s.day_of_week)))
     if (!availableDays.has(jsToOurDay(new Date().getDay()))) return []
     const now = new Date()
@@ -189,6 +192,13 @@ export default function DoctorPublicProfile() {
       .eq('id', id)
       .single()
     if (dpExtra?.slot_duration_minutes) setSlotDuration(dpExtra.slot_duration_minutes)
+
+    // Load blocked dates
+    const { data: blocked } = await supabase
+      .from('doctor_blocked_dates')
+      .select('date')
+      .eq('doctor_id', id)
+    setBlockedDates(new Set((blocked ?? []).map((b: { date: string }) => b.date)))
 
     const { data: reviewData } = await supabase
       .from('doctor_reviews')

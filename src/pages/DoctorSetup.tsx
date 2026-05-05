@@ -58,6 +58,10 @@ export default function DoctorSetup() {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [verifyMsg, setVerifyMsg] = useState('')
+  const [blockedDates, setBlockedDates] = useState<{ id: string; date: string; reason: string | null }[]>([])
+  const [newBlockDate, setNewBlockDate] = useState('')
+  const [newBlockReason, setNewBlockReason] = useState('')
+  const [blockingDate, setBlockingDate] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -119,7 +123,35 @@ export default function DoctorSetup() {
       setZoneSchedules(newSchedules)
     }
 
+    const { data: blocked } = await supabase
+      .from('doctor_blocked_dates')
+      .select('id, date, reason')
+      .eq('doctor_id', user!.id)
+      .order('date', { ascending: true })
+    setBlockedDates(blocked ?? [])
+
     setFetching(false)
+  }
+
+  async function handleAddBlockedDate() {
+    if (!newBlockDate) return
+    setBlockingDate(true)
+    const { data, error } = await supabase.from('doctor_blocked_dates').insert({
+      doctor_id: user!.id,
+      date: newBlockDate,
+      reason: newBlockReason.trim() || null,
+    }).select('id, date, reason').single()
+    if (!error && data) {
+      setBlockedDates((prev) => [...prev, data].sort((a, b) => a.date.localeCompare(b.date)))
+      setNewBlockDate('')
+      setNewBlockReason('')
+    }
+    setBlockingDate(false)
+  }
+
+  async function handleRemoveBlockedDate(id: string) {
+    await supabase.from('doctor_blocked_dates').delete().eq('id', id)
+    setBlockedDates((prev) => prev.filter((d) => d.id !== id))
   }
 
   function toggleSpecialty(s: string) {
@@ -721,6 +753,67 @@ export default function DoctorSetup() {
           </button>
         </div>
       </form>
+
+      {/* Blocked dates */}
+      <div className="mt-8 card space-y-4">
+        <h2 className="text-lg font-semibold text-gray-800">Fechas bloqueadas</h2>
+        <p className="text-sm text-gray-500">Marcá días en los que no vas a atender (vacaciones, feriados, etc.).</p>
+
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[160px]">
+            <label className="label">Fecha</label>
+            <input
+              type="date"
+              className="input"
+              value={newBlockDate}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setNewBlockDate(e.target.value)}
+            />
+          </div>
+          <div className="flex-[2] min-w-[180px]">
+            <label className="label">Motivo (opcional)</label>
+            <input
+              type="text"
+              className="input"
+              placeholder="Ej: Vacaciones"
+              value={newBlockReason}
+              onChange={(e) => setNewBlockReason(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={handleAddBlockedDate}
+            disabled={!newBlockDate || blockingDate}
+            className="btn-primary text-sm disabled:opacity-50"
+          >
+            {blockingDate ? 'Agregando...' : 'Bloquear día'}
+          </button>
+        </div>
+
+        {blockedDates.length > 0 ? (
+          <ul className="divide-y divide-gray-100">
+            {blockedDates.map((b) => {
+              const d = new Date(b.date + 'T12:00:00')
+              const label = d.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+              return (
+                <li key={b.id} className="flex items-center justify-between py-2.5 gap-3">
+                  <div>
+                    <p className="text-sm text-gray-800 capitalize">{label}</p>
+                    {b.reason && <p className="text-xs text-gray-400">{b.reason}</p>}
+                  </div>
+                  <button
+                    onClick={() => handleRemoveBlockedDate(b.id)}
+                    className="text-xs text-red-500 hover:text-red-700 flex-shrink-0"
+                  >
+                    Quitar
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-400">No tenés fechas bloqueadas.</p>
+        )}
+      </div>
 
       <div className="mt-8">
         <ChangePasswordForm />
